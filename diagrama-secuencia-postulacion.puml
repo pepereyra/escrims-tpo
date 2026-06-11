@@ -1,0 +1,197 @@
+@startuml diagrama-secuencia-postulacion
+title Caso de Uso: Postulación al Scrim\n(4to jugador completa los cupos → transición automática + notificación)
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam participant {
+    BackgroundColor #EEF2FF
+    BorderColor #4F46E5
+    FontColor #1E1B4B
+}
+skinparam actor {
+    BackgroundColor #FEF3C7
+    BorderColor #D97706
+}
+skinparam note {
+    BackgroundColor #F0FDF4
+    BorderColor #16A34A
+}
+skinparam ArrowColor #4F46E5
+
+' ── Participantes ──────────────────────────────────────────────────────────────
+actor       "Usuario (Delta)"       as U
+participant "ScrimFacade"           as SF
+participant "ScrimController"       as SC
+participant "ScrimContext"          as CTX
+participant "BuscandoState"         as BS
+participant "Postulacion"           as POST
+participant "Confirmacion"          as CONF
+participant "DomainEventBus"        as BUS
+participant "NotificationSubscriber\n(Email)" as NS_EMAIL
+participant "NotificationSubscriber\n(Push)"  as NS_PUSH
+participant "EmailNotificador"      as EMAIL
+participant "PushNotificador"       as PUSH
+
+' ── Flujo principal ────────────────────────────────────────────────────────────
+== Postulación del 4to jugador (Delta) ==
+
+U -> SF : postular(scrimId, delta, ROL.SUPPORT)
+activate SF
+
+note right of SF
+  PATRON FACADE: ScrimFacade es el
+  punto de entrada único al subsistema.
+  Simplifica la interfaz para el cliente
+  (GRASP Low Coupling, SOLID SRP).
+end note
+
+SF -> SC : postular(scrimId, delta, ROL.SUPPORT)
+activate SC
+
+SC -> CTX : postular(delta, ROL.SUPPORT)
+activate CTX
+
+note right of CTX
+  PATRON STATE: ScrimContext delega
+  la operación al estado actual
+  (BuscandoState). No conoce la
+  lógica interna de cada estado.
+end note
+
+CTX -> BS : postular(ctx, delta, ROL.SUPPORT)
+activate BS
+
+' Validaciones
+BS -> BS : validar email verificado ✓
+BS -> BS : validar cooldown inactivo ✓
+BS -> BS : validar no postulado antes ✓
+BS -> BS : validar rango [1400-1700] ✓
+BS -> BS : validar latencia ≤ 80ms ✓
+BS -> BS : validar cupos disponibles > 0 ✓
+
+note right of BS
+  GRASP Information Expert:
+  BuscandoState conoce todas las
+  reglas de negocio para postular.
+  GRASP Creator: crea Postulacion
+  y Confirmacion (las contiene).
+end note
+
+' Crear Postulacion
+BS -> POST : new Postulacion(delta, ROL.SUPPORT)
+activate POST
+POST --> BS : postulacion
+deactivate POST
+
+BS -> POST : aceptar()
+activate POST
+POST --> BS : ok
+deactivate POST
+
+BS -> CTX : getPostulaciones().add(postulacion)
+
+' Crear Confirmacion
+BS -> CONF : new Confirmacion(delta)
+activate CONF
+CONF --> BS : confirmacion
+deactivate CONF
+
+BS -> CTX : getConfirmaciones().add(confirmacion)
+
+' Verificar cupos
+BS -> CTX : cuposDisponibles()
+activate CTX
+CTX --> BS : 0  (¡cupos completos!)
+deactivate CTX
+
+== Transición automática: BUSCANDO → LOBBY_ARMADO ==
+
+BS -> CTX : setState(new LobbyArmadoState())
+activate CTX
+CTX --> BS : ok
+deactivate CTX
+
+note right of BS
+  PATRON STATE: la transición
+  la decide el propio estado,
+  no el contexto ni el controller.
+  Bajo Acoplamiento (GRASP).
+end note
+
+BS -> CTX : publicarEvento(ScrimStateChangedEvent\n  "BUSCANDO" → "LOBBY_ARMADO")
+activate CTX
+
+CTX -> BUS : publicar(ScrimStateChangedEvent)
+activate BUS
+
+note right of BUS
+  PATRON OBSERVER: el EventBus
+  notifica a todos los suscriptores
+  registrados sin conocerlos
+  concretamente (DIP - SOLID).
+end note
+
+== Notificación a los jugadores (Observer + Strategy) ==
+
+BUS -> NS_EMAIL : notificar(ScrimStateChangedEvent)
+activate NS_EMAIL
+
+note right of NS_EMAIL
+  PATRON STRATEGY: cada
+  NotificationSubscriber delega
+  el envío en su NotificadorStrategy
+  concreto (Email, Push, Discord).
+  Intercambiable en runtime.
+end note
+
+NS_EMAIL -> EMAIL : enviar("Lobby armado para el scrim de Valorant")
+activate EMAIL
+EMAIL --> NS_EMAIL : ok  [simula envío por consola en DEV]
+deactivate EMAIL
+
+NS_EMAIL --> BUS : ok
+deactivate NS_EMAIL
+
+BUS -> NS_PUSH : notificar(ScrimStateChangedEvent)
+activate NS_PUSH
+
+NS_PUSH -> PUSH : enviar("Lobby armado para el scrim de Valorant")
+activate PUSH
+PUSH --> NS_PUSH : ok  [simula envío por consola en DEV]
+deactivate PUSH
+
+NS_PUSH --> BUS : ok
+deactivate NS_PUSH
+
+BUS --> CTX : ok
+deactivate BUS
+
+CTX --> BS : ok
+deactivate CTX
+
+BS --> CTX : ok
+deactivate BS
+
+CTX --> SC : ok
+deactivate CTX
+
+SC --> SF : ScrimContext (estado = LOBBY_ARMADO)
+deactivate SC
+
+SF --> U : ScrimContext (estado = LOBBY_ARMADO)
+deactivate SF
+
+== Estado final ==
+
+note over U, PUSH
+  El scrim pasó de BUSCANDO a LOBBY_ARMADO automáticamente.
+  Alpha y Bravo recibieron notificación por Email.
+  Charlie y Delta recibieron notificación por Push.
+  Todos deben confirmar para avanzar a CONFIRMADO.
+end note
+
+@enduml
