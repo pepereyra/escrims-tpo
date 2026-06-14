@@ -5,7 +5,15 @@ import escrims.facade.ScrimFacade;
 import escrims.infra.events.DomainEventBus;
 import escrims.infra.notification.DevNotificadorFactory;
 import escrims.infra.notification.NotificadorFactory;
+import escrims.service.AuthService;
+import escrims.service.FeedbackRepository;
+import escrims.service.JwtService;
+import escrims.service.ModeracionService;
+import escrims.service.PasswordHasher;
+import escrims.service.ReporteConductaRepository;
+import escrims.service.ScrimRepository;
 import escrims.service.ScrimService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,8 +31,27 @@ public class ApiConfig {
     }
 
     @Bean
-    public ScrimService scrimService(DomainEventBus eventBus, NotificadorFactory factory) {
-        return new ScrimService(eventBus, factory);
+    public PasswordHasher passwordHasher() {
+        return new PasswordHasher();
+    }
+
+    @Bean
+    public JwtService jwtService(@Value("${app.jwt.secret:dev-secret-change-me-12345678901234567890}") String secret) {
+        return new JwtService(secret);
+    }
+
+    @Bean
+    public AuthService authService(UsuarioApiRepository usuarios,
+                                   PasswordHasher passwordHasher,
+                                   JwtService jwtService) {
+        return new AuthService(usuarios, passwordHasher, jwtService);
+    }
+
+    @Bean
+    public ScrimService scrimService(DomainEventBus eventBus,
+                                     NotificadorFactory factory,
+                                     ScrimRepository scrimRepository) {
+        return new ScrimService(eventBus, factory, scrimRepository);
     }
 
     @Bean
@@ -35,5 +62,12 @@ public class ApiConfig {
     @Bean
     public ScrimFacade scrimFacade(ScrimController controller) {
         return new ScrimFacade(controller);
+    }
+
+    @Bean
+    public ModeracionService moderacionService(ScrimService scrimService,
+                                               FeedbackRepository feedbackRepository,
+                                               ReporteConductaRepository reporteRepository) {
+        return new ModeracionService(scrimService, feedbackRepository, reporteRepository);
     }
 }

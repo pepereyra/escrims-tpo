@@ -113,6 +113,18 @@ public class ScrimFacade {
         controller.cancelar(scrimId);
     }
 
+    public void cambiarRol(UUID scrimId, Usuario usuario, Rol nuevoRol) {
+        controller.cambiarRol(scrimId, usuario, nuevoRol);
+    }
+
+    public void intercambiarRoles(UUID scrimId, Usuario usuarioA, Usuario usuarioB) {
+        controller.intercambiarRoles(scrimId, usuarioA, usuarioB);
+    }
+
+    public void moverASuplente(UUID scrimId, Usuario usuario) {
+        controller.moverASuplente(scrimId, usuario);
+    }
+
     public void configurarNotificacionesEmail(List<Usuario> destinatarios) {
         controller.configurarNotificacionesEmail(destinatarios);
     }
@@ -147,5 +159,9 @@ public class ScrimFacade {
 
     public ScrimContext getScrim(UUID scrimId) {
         return controller.getScrim(scrimId);
+    }
+
+    public List<ScrimContext> listarScrims() {
+        return controller.listarScrims();
     }
 }

@@ -53,3 +53,15 @@ class RechazadaPostulacion implements EstadoPostulacion {
         return getNombre();
     }
 }
+
+class SuplentePostulacion implements EstadoPostulacion {
+    @Override
+    public String getNombre() {
+        return "SUPLENTE";
+    }
+
+    @Override
+    public String toString() {
+        return getNombre();
+    }
+}

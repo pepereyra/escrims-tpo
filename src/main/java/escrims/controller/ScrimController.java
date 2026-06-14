@@ -76,6 +76,18 @@ public class ScrimController {
         scrimService.cancelar(scrimId);
     }
 
+    public void cambiarRol(UUID scrimId, Usuario usuario, Rol nuevoRol) {
+        scrimService.cambiarRol(scrimId, usuario, nuevoRol);
+    }
+
+    public void intercambiarRoles(UUID scrimId, Usuario usuarioA, Usuario usuarioB) {
+        scrimService.intercambiarRoles(scrimId, usuarioA, usuarioB);
+    }
+
+    public void moverASuplente(UUID scrimId, Usuario usuario) {
+        scrimService.moverASuplente(scrimId, usuario);
+    }
+
     public List<Estadistica> registrarEstadisticas(UUID scrimId,
                                                    Map<Usuario, int[]> resultados) {
 
@@ -110,5 +122,9 @@ public class ScrimController {
 
     public ScrimContext getScrim(UUID scrimId) {
         return scrimService.getScrim(scrimId);
+    }
+
+    public List<ScrimContext> listarScrims() {
+        return List.copyOf(scrimService.getScrims().values());
     }
 }

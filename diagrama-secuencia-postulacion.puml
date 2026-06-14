@@ -1,5 +1,5 @@
-@startuml diagrama-secuencia-postulacion
-title Caso de Uso: Postulación al Scrim\n(4to jugador completa los cupos → transición automática + notificación)
+@startuml
+title Caso de Uso: Postulacion al Scrim\n4to jugador completa cupos y pasa a lobby
 
 skinparam sequenceMessageAlign center
 skinparam responseMessageBelowArrow true
@@ -22,77 +22,67 @@ skinparam note {
 }
 skinparam ArrowColor #4F46E5
 
-' ── Participantes ──────────────────────────────────────────────────────────────
-actor       "Usuario (Delta)"       as U
-participant "ScrimFacade"           as SF
-participant "ScrimController"       as SC
-participant "ScrimService"          as SS
-participant "ScrimContext"          as CTX
-participant "BuscandoState"         as BS
+actor "Usuario Delta" as U
+participant "ScrimFacade" as SF
+participant "ScrimController" as SC
+participant "ScrimService" as SS
+participant "ScrimContext" as CTX
+participant "BuscandoState" as BS
 participant "CompositeMatchmaking\nStrategy" as MMS
-participant "Postulacion"           as POST
-participant "Confirmacion"          as CONF
-participant "DomainEventBus"        as BUS
-participant "NotificationSubscriber\n(Email)" as NS_EMAIL
-participant "NotificationSubscriber\n(Push)"  as NS_PUSH
-participant "EmailNotificador"      as EMAIL
-participant "PushNotificador"       as PUSH
+participant "Postulacion" as POST
+participant "Confirmacion" as CONF
+participant "DomainEventBus" as BUS
+participant "NotificationSubscriber\nEmail" as NS_EMAIL
+participant "NotificationSubscriber\nPush" as NS_PUSH
+participant "EmailNotificador" as EMAIL
+participant "PushNotificador" as PUSH
 
-' ── Flujo principal ────────────────────────────────────────────────────────────
-== Postulación del 4to jugador (Delta) ==
+== Postulacion del cuarto jugador ==
 
-U -> SF : postular(scrimId, delta, Rol.SUPPORT)
+U -> SF : postular(scrimId, delta, SUPPORT)
 activate SF
 
 note right of SF
-  PATRON FACADE: ScrimFacade es el
-  punto de entrada único al subsistema.
-  Simplifica la interfaz para el cliente
-  (GRASP Low Coupling, SOLID SRP).
+  FACADE:
+  ScrimFacade es el punto de entrada
+  unico al subsistema.
 end note
 
-SF -> SC : postular(scrimId, delta, Rol.SUPPORT)
+SF -> SC : postular(scrimId, delta, SUPPORT)
 activate SC
 
-SC -> SS : postular(scrimId, delta, Rol.SUPPORT)
+SC -> SS : postular(scrimId, delta, SUPPORT)
 activate SS
 
-SS -> CTX : postular(delta, Rol.SUPPORT)
+SS -> CTX : postular(delta, SUPPORT)
 activate CTX
 
 note right of CTX
-  PATRON STATE: ScrimContext delega
-  la operación al estado actual
-  (BuscandoState). No conoce la
-  lógica interna de cada estado.
+  STATE:
+  ScrimContext delega la operacion
+  al estado actual.
 end note
 
-CTX -> BS : postular(ctx, delta, Rol.SUPPORT)
+CTX -> BS : postular(ctx, delta, SUPPORT)
 activate BS
 
-' Validaciones
-BS -> BS : validar email verificado ✓
-BS -> BS : validar no postulado antes ✓
-BS -> BS : validar cupos disponibles > 0 ✓
+BS -> BS : validar usuario verificado
+BS -> BS : validar usuario no postulado
+BS -> BS : validar cupos disponibles
 BS -> CTX : getMatchmakingStrategy()
 CTX --> BS : MatchmakingStrategy
 BS -> MMS : esCompatible(delta, ctx)
 activate MMS
-MMS --> BS : true\n(MMR + latencia + historial)
+MMS --> BS : true
 deactivate MMS
 
 note right of BS
-  PATRON STRATEGY:
-  BuscandoState no valida MMR,
-  latencia ni historial directamente.
-  Delega esas reglas en
-  MatchmakingStrategy.
-  GRASP Creator: crea Postulacion
-  y Confirmacion (las contiene).
+  STRATEGY:
+  BuscandoState delega MMR,
+  latencia e historial.
 end note
 
-' Crear Postulacion
-BS -> POST : new Postulacion(delta, Rol.SUPPORT)
+BS -> POST : new Postulacion(delta, SUPPORT)
 activate POST
 POST --> BS : postulacion
 deactivate POST
@@ -102,109 +92,78 @@ activate POST
 POST --> BS : ok
 deactivate POST
 
-BS -> CTX : getPostulaciones().add(postulacion)
+BS -> CTX : agregar postulacion
 
-' Crear Confirmacion
 BS -> CONF : new Confirmacion(delta)
 activate CONF
 CONF --> BS : confirmacion
 deactivate CONF
 
-BS -> CTX : getConfirmaciones().add(confirmacion)
+BS -> CTX : agregar confirmacion
 
-' Verificar cupos
 BS -> CTX : cuposDisponibles()
 activate CTX
-CTX --> BS : 0  (¡cupos completos!)
+CTX --> BS : 0
 deactivate CTX
 
-== Transición automática: BUSCANDO → LOBBY_ARMADO ==
+== Transicion automatica ==
 
 BS -> CTX : setState(new LobbyArmadoState())
 activate CTX
 CTX --> BS : ok
 deactivate CTX
 
-note right of BS
-  PATRON STATE: la transición
-  la decide el propio estado,
-  no el contexto ni el controller.
-  Bajo Acoplamiento (GRASP).
-end note
-
-BS -> CTX : publicarEvento(ScrimStateChangedEvent\n  "BUSCANDO" → "LOBBY_ARMADO")
+BS -> CTX : publicarEvento(LOBBY_ARMADO)
 activate CTX
 
-CTX -> BUS : publish(ScrimStateChangedEvent)
+CTX -> BUS : publish(evento)
 activate BUS
 
 note right of BUS
-  PATRON OBSERVER: el EventBus
-  notifica a todos los suscriptores
-  registrados sin conocerlos
-  concretamente (DIP - SOLID).
+  OBSERVER:
+  EventBus notifica a todos
+  los suscriptores registrados.
 end note
 
-== Notificación a los jugadores (Observer + Strategy) ==
+== Notificaciones ==
 
-BUS -> NS_EMAIL : onEvent(ScrimStateChangedEvent)
+BUS -> NS_EMAIL : onEvent(evento)
 activate NS_EMAIL
-
-note right of NS_EMAIL
-  PATRON STRATEGY: cada
-  NotificationSubscriber delega
-  el envío en su NotificadorStrategy
-  concreto (Email, Push, Discord).
-  Intercambiable en runtime.
-end note
-
-NS_EMAIL -> EMAIL : enviar("Lobby armado para el scrim de Valorant")
+NS_EMAIL -> EMAIL : enviar(notificacion)
 activate EMAIL
-EMAIL --> NS_EMAIL : ok  [simula envío por consola en DEV]
+EMAIL --> NS_EMAIL : ok
 deactivate EMAIL
-
 NS_EMAIL --> BUS : ok
 deactivate NS_EMAIL
 
-BUS -> NS_PUSH : onEvent(ScrimStateChangedEvent)
+BUS -> NS_PUSH : onEvent(evento)
 activate NS_PUSH
-
-NS_PUSH -> PUSH : enviar("Lobby armado para el scrim de Valorant")
+NS_PUSH -> PUSH : enviar(notificacion)
 activate PUSH
-PUSH --> NS_PUSH : ok  [simula envío por consola en DEV]
+PUSH --> NS_PUSH : ok
 deactivate PUSH
-
 NS_PUSH --> BUS : ok
 deactivate NS_PUSH
 
 BUS --> CTX : ok
 deactivate BUS
-
 CTX --> BS : ok
 deactivate CTX
-
 BS --> CTX : ok
 deactivate BS
-
 CTX --> SS : ok
 deactivate CTX
-
 SS --> SC : ok
 deactivate SS
-
-SC --> SF : ScrimContext (estado = LOBBY_ARMADO)
+SC --> SF : ScrimContext estado LOBBY_ARMADO
 deactivate SC
-
-SF --> U : ScrimContext (estado = LOBBY_ARMADO)
+SF --> U : ScrimContext estado LOBBY_ARMADO
 deactivate SF
 
-== Estado final ==
-
 note over U, PUSH
-  El scrim pasó de BUSCANDO a LOBBY_ARMADO automáticamente.
-  Alpha y Bravo recibieron notificación por Email.
-  Charlie y Delta recibieron notificación por Push.
-  Todos deben confirmar para avanzar a CONFIRMADO.
+  El scrim paso de BUSCANDO a LOBBY_ARMADO.
+  Los participantes reciben notificaciones.
+  Luego todos deben confirmar.
 end note
 
 @enduml

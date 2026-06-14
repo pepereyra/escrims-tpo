@@ -5,7 +5,8 @@
 ## 1. PATRONES DE DISEÑO
 
 Los patrones obligatorios según el enunciado son: **State, Strategy, Observer y Facade**.
-El proyecto también aplica **Abstract Factory**, **Adapter** y **Builder** como patrones adicionales.
+El proyecto también aplica **Abstract Factory**, **Adapter**, **Repository**, **Builder** y
+**Command** como patrones adicionales.
 
 ---
 
@@ -203,7 +204,37 @@ fábrica concreta, no el dominio, ni `NotificationSubscriber`, ni `ScrimContext`
 
 ---
 
-### 1.7 Patrón BUILDER — Construcción incremental de Scrim
+### 1.7 Patrón REPOSITORY — Persistencia desacoplada del dominio
+
+**Problema que resuelve:**
+La consigna pide persistencia, pero anotar directamente las clases de dominio con JPA
+mezclaría reglas de negocio con detalles de base de datos. Eso aumenta el acoplamiento y
+haría que `ScrimContext`, estados y entidades cambien por decisiones tecnológicas.
+
+**Cómo se aplica:**
+- `ScrimRepository` define el contrato de persistencia usado por `ScrimService`.
+- `InMemoryScrimRepository` conserva el comportamiento simple para `Main` y tests unitarios.
+- `JpaScrimRepositoryAdapter` implementa el repositorio usando Spring Data JPA y traduce entre
+  el dominio (`ScrimContext`) y la entidad persistente (`ScrimJpaEntity`).
+- La persistencia esta normalizada: `postulaciones`, `confirmaciones` y `estadisticas` son
+  tablas propias relacionadas con `scrims` y `usuarios`, no un JSON embebido.
+- `UsuarioApiRepository` usa `SpringDataUsuarioJpaRepository` y `UsuarioJpaEntity` para
+  persistir usuarios de la API.
+- Las entidades JPA quedan en `escrims.infra.persistence`; el dominio no depende de JPA.
+
+**Relación con el material de la cátedra:**
+De los patrones de acceso a datos vistos (DAO, Repository, Active Record y Table Data Gateway),
+se elige Repository porque el dominio tiene reglas ricas y se busca una capa que parezca una
+colección de objetos de dominio, no un modelo Active Record acoplado a la base.
+
+**Beneficio clave:**
+`ScrimService` depende de la abstracción `ScrimRepository`. En Spring se usa JPA con H2 o
+MySQL segun el perfil activo; fuera de Spring se usa memoria. Cambia la persistencia sin
+cambiar el dominio ni los estados.
+
+---
+
+### 1.8 Patrón BUILDER — Construcción incremental de Scrim
 
 **Problema que resuelve:**
 `ScrimContext` tiene múltiples parámetros en su constructor. Construirlo directamente es
@@ -235,6 +266,38 @@ ScrimContext scrim = new ScrimBuilder(eventBus)
     .cuposTotales(4)
     .build();
 ```
+
+---
+
+### 1.9 Patron COMMAND - Gestion de roles y suplentes
+
+**Problema que resuelve:**
+La gestion de equipos puede crecer con acciones distintas: cambiar roles, intercambiar roles,
+mover jugadores a suplente, remover postulantes o auditar operaciones. Si todas esas acciones
+quedaran como metodos con logica duplicada en controller o service, el caso de uso seria mas
+dificil de extender y testear.
+
+**Como se aplica:**
+- `ScrimCommand` define el contrato comun: `ejecutar(): void`.
+- `CambiarRolCommand` encapsula el cambio de rol de un jugador aceptado.
+- `IntercambiarRolesCommand` encapsula el swap de roles entre dos jugadores aceptados.
+- `MoverASuplenteCommand` encapsula el movimiento de un jugador aceptado a estado
+  `SUPLENTE`, libera su cupo y remueve su confirmacion pendiente.
+- `ScrimService` actua como invocador: obtiene el scrim, crea el comando correspondiente,
+  ejecuta la accion y persiste el agregado mediante `ScrimRepository`.
+- `ScrimContext` conserva las reglas de negocio: solo permite estas operaciones antes de
+  `EN_JUEGO`, `FINALIZADO` o `CANCELADO`.
+
+**Ejemplo de uso real:**
+```java
+ScrimCommand command = new IntercambiarRolesCommand(scrim, alpha, bravo);
+command.ejecutar();
+scrimRepository.save(scrim);
+```
+
+**Beneficio clave:**
+Agregar una accion nueva de gestion de equipo no requiere modificar el flujo de estados ni
+duplicar logica en la API. Se agrega un nuevo comando y un metodo de aplicacion que lo invoque.
 
 ---
 
@@ -270,6 +333,8 @@ agrega, registra o usa objetos de tipo A.
 | `ScrimStateChangedEvent` | Los estados concretos | Cada estado sabe qué evento publicar al transicionar |
 | `Notificacion` | `NotificationSubscriber` | Tiene el evento y el canal, puede construir la notificación |
 | Notificadores/adapters concretos | `NotificadorFactory` | Es la responsabilidad explícita de la fábrica |
+| Snapshots persistentes de scrim | `JpaScrimRepositoryAdapter` | Traduce el agregado de dominio a entidades JPA |
+| Acciones de gestion de roles | `ScrimCommand` concretos | Cada comando contiene los datos y ejecuta una accion especifica |
 
 ---
 
@@ -323,6 +388,8 @@ Decisiones de diseño que reducen el acoplamiento:
 7. **La API REST no conoce servicios internos**: `ScrimRestController` delega en
    `ScrimFacade`; si cambia la implementacion de `ScrimService`, el contrato HTTP no
    necesita cambiar.
+8. **La persistencia queda en infraestructura**: `ScrimContext` y los estados no conocen
+   JPA, H2 ni Spring Data.
 
 ---
 
@@ -336,6 +403,10 @@ responsabilidades fuertemente relacionadas.
 | `ScrimFacade` | Solo simplifica el acceso al subsistema de scrims |
 | `ScrimRestController` | Solo traduce requests HTTP a operaciones de la fachada |
 | `UsuarioRestController` | Solo administra usuarios de prueba para la API REST |
+| `JpaScrimRepositoryAdapter` | Solo traduce y persiste scrims con JPA |
+| `CambiarRolCommand` | Solo cambia el rol de un jugador aceptado |
+| `IntercambiarRolesCommand` | Solo intercambia roles entre dos jugadores aceptados |
+| `MoverASuplenteCommand` | Solo mueve un jugador aceptado a suplente |
 | `BuscandoState` | Solo maneja la lógica del estado "buscando jugadores" |
 | `EmailNotificador` | Solo envía notificaciones por email |
 | `ScrimBuilder` | Solo construye y valida instancias de `ScrimContext` |
@@ -366,6 +437,8 @@ responsabilidad está delegada a su clase correspondiente.
   No cambia si cambia la implementación interna.
 - `ScrimRestController` cambia solo si cambia el contrato HTTP.
   No cambia si cambia la logica interna de estados, matchmaking o notificaciones.
+- `JpaScrimRepositoryAdapter` cambia solo si cambia la forma de persistir scrims.
+  No cambia si cambia una regla de negocio de State.
 
 **Violación evitada:** Si `ScrimContext` tuviera métodos como `enviarEmailAJugadores()` o
 `validarRango()`, tendría múltiples razones para cambiar → violación de SRP.
@@ -434,7 +507,7 @@ de abstracciones.**
 | `ScrimRestController` | `ScrimFacade` | `ScrimService`, estados concretos, factories concretas |
 | `ScrimContext` | `DomainEventBus`, `ScrimState`, `MatchmakingStrategy` | `EmailNotificador`, criterios concretos de matchmaking |
 | `NotificationSubscriber` | `NotificadorStrategy` | `PushNotificador`, `EmailNotificador`, `DiscordNotificador` |
-| `ScrimService` | `NotificadorFactory`, `NotificadorStrategy` | `DevNotificadorFactory`, `ProdNotificadorFactory` |
+| `ScrimService` | `NotificadorFactory`, `NotificadorStrategy`, `ScrimRepository` | `DevNotificadorFactory`, `ProdNotificadorFactory`, JPA |
 | `ProdNotificadorFactory` | `NotificadorStrategy` | Cliente de aplicación y dominio |
 
 **Aplicación de DIP en la fábrica:** `NotificationSubscriber` recibe un `NotificadorStrategy`
@@ -454,7 +527,9 @@ usar la toma `NotificadorFactory`, que está en la capa de infraestructura, no e
 | Las notificaciones se desacoplan del dominio | **Observer + DIP** | El dominio no conoce los canales de notificación |
 | Los notificadores se crean por fábrica según entorno | **Abstract Factory** | Intercambio dev/prod sin cambiar código cliente |
 | Los proveedores externos se aíslan con adapters | **Adapter + DIP** | SendGrid/Firebase/Discord no contaminan dominio |
+| La persistencia se abstrae como colección de dominio | **Repository + DIP** | JPA, H2 y MySQL quedan en infraestructura |
 | El inicio por fechaHora se procesa fuera del estado | **Service + State** | Simula scheduler sin meter threads ni cron en el dominio |
 | El scrim se construye con validaciones | **Builder + SRP** | Objeto siempre válido, construcción legible |
+| Las acciones de gestion de roles se encapsulan | **Command + SRP** | Cambios, swaps y suplentes quedan como objetos ejecutables |
 | Cada clase tiene una sola responsabilidad | **SRP + High Cohesion** | Fácil de mantener, testear y extender |
 | Las dependencias apuntan a abstracciones | **DIP + Low Coupling** | Bajo acoplamiento entre capas |

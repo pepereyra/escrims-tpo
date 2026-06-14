@@ -13,13 +13,23 @@ public class Estadistica {
     private String observaciones;
 
     public Estadistica(Usuario usuario) {
-        this.id = UUID.randomUUID();
+        this(UUID.randomUUID(), usuario, false, 0, 0, 0, "");
+    }
+
+    public Estadistica(UUID id,
+                       Usuario usuario,
+                       boolean mvp,
+                       int kills,
+                       int deaths,
+                       int assists,
+                       String observaciones) {
+        this.id = id;
         this.usuario = usuario;
-        this.mvp = false;
-        this.kills = 0;
-        this.deaths = 0;
-        this.assists = 0;
-        this.observaciones = "";
+        this.mvp = mvp;
+        this.kills = kills;
+        this.deaths = deaths;
+        this.assists = assists;
+        this.observaciones = observaciones == null ? "" : observaciones;
     }
 
     public UUID getId() { return id; }

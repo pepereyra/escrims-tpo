@@ -1,5 +1,9 @@
 package escrims.service;
 
+import escrims.domain.command.CambiarRolCommand;
+import escrims.domain.command.IntercambiarRolesCommand;
+import escrims.domain.command.MoverASuplenteCommand;
+import escrims.domain.command.ScrimCommand;
 import escrims.domain.model.Estadistica;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
@@ -12,7 +16,7 @@ import escrims.infra.notification.NotificadorStrategy;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,13 +42,19 @@ import java.util.UUID;
  */
 public class ScrimService {
 
-    private final Map<UUID, ScrimContext> scrims;
+    private final ScrimRepository scrimRepository;
     private final DomainEventBus eventBus;
     private final NotificadorFactory notificadorFactory;
     private final ScrimSchedulerService schedulerService;
 
     public ScrimService(DomainEventBus eventBus, NotificadorFactory notificadorFactory) {
-        this.scrims = new HashMap<>();
+        this(eventBus, notificadorFactory, new InMemoryScrimRepository());
+    }
+
+    public ScrimService(DomainEventBus eventBus,
+                        NotificadorFactory notificadorFactory,
+                        ScrimRepository scrimRepository) {
+        this.scrimRepository = scrimRepository;
         this.eventBus = eventBus;
         this.notificadorFactory = notificadorFactory;
         this.schedulerService = new ScrimSchedulerService(this);
@@ -71,7 +81,7 @@ public class ScrimService {
                 .cuposTotales(cuposTotales)
                 .build();
 
-        scrims.put(scrim.getId(), scrim);
+        scrimRepository.save(scrim);
 
         System.out.println("[ScrimService] Scrim creado: " + scrim);
 
@@ -81,26 +91,51 @@ public class ScrimService {
     public void postular(UUID scrimId, Usuario usuario, Rol rol) {
         ScrimContext scrim = getScrim(scrimId);
         scrim.postular(usuario, rol);
+        scrimRepository.save(scrim);
     }
 
     public void confirmar(UUID scrimId, Usuario usuario) {
         ScrimContext scrim = getScrim(scrimId);
         scrim.confirmar(usuario);
+        scrimRepository.save(scrim);
     }
 
     public void iniciar(UUID scrimId) {
         ScrimContext scrim = getScrim(scrimId);
         scrim.iniciar();
+        scrimRepository.save(scrim);
     }
 
     public void finalizar(UUID scrimId) {
         ScrimContext scrim = getScrim(scrimId);
         scrim.finalizar();
+        scrimRepository.save(scrim);
     }
 
     public void cancelar(UUID scrimId) {
         ScrimContext scrim = getScrim(scrimId);
         scrim.cancelar();
+        scrimRepository.save(scrim);
+    }
+
+    public void cambiarRol(UUID scrimId, Usuario usuario, Rol nuevoRol) {
+        ScrimContext scrim = getScrim(scrimId);
+        ejecutar(scrim, new CambiarRolCommand(scrim, usuario, nuevoRol));
+    }
+
+    public void intercambiarRoles(UUID scrimId, Usuario usuarioA, Usuario usuarioB) {
+        ScrimContext scrim = getScrim(scrimId);
+        ejecutar(scrim, new IntercambiarRolesCommand(scrim, usuarioA, usuarioB));
+    }
+
+    public void moverASuplente(UUID scrimId, Usuario usuario) {
+        ScrimContext scrim = getScrim(scrimId);
+        ejecutar(scrim, new MoverASuplenteCommand(scrim, usuario));
+    }
+
+    private void ejecutar(ScrimContext scrim, ScrimCommand command) {
+        command.ejecutar();
+        scrimRepository.save(scrim);
     }
 
     public List<Estadistica> registrarEstadisticas(UUID scrimId,
@@ -139,6 +174,10 @@ public class ScrimService {
         if (mvpCandidate != null) {
             mvpCandidate.setMvp(true);
         }
+
+        scrim.getEstadisticas().clear();
+        scrim.getEstadisticas().addAll(estadisticas);
+        scrimRepository.save(scrim);
 
         System.out.println("[ScrimService] Estadísticas registradas para scrim " + scrimId);
         estadisticas.forEach(System.out::println);
@@ -179,7 +218,7 @@ public class ScrimService {
     }
 
     public ScrimContext getScrim(UUID scrimId) {
-        ScrimContext scrim = scrims.get(scrimId);
+        ScrimContext scrim = scrimRepository.findById(scrimId).orElse(null);
 
         if (scrim == null) {
             throw new IllegalArgumentException("Scrim no encontrado: " + scrimId);
@@ -189,6 +228,10 @@ public class ScrimService {
     }
 
     public Map<UUID, ScrimContext> getScrims() {
+        Map<UUID, ScrimContext> scrims = new LinkedHashMap<>();
+        for (ScrimContext scrim : scrimRepository.findAll()) {
+            scrims.put(scrim.getId(), scrim);
+        }
         return scrims;
     }
 }

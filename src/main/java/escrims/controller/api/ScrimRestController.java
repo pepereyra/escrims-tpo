@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -55,6 +56,26 @@ public class ScrimRestController {
         return toResponse(facade.getScrim(scrimId));
     }
 
+    @GetMapping("/scrims")
+    public List<ApiDtos.ScrimResponse> buscarScrims(@RequestParam(value = "juego", required = false) String juego,
+                                                    @RequestParam(value = "formato", required = false) String formato,
+                                                    @RequestParam(value = "region", required = false) String region,
+                                                    @RequestParam(value = "rangoMin", required = false) Integer rangoMin,
+                                                    @RequestParam(value = "rangoMax", required = false) Integer rangoMax,
+                                                    @RequestParam(value = "fecha", required = false) LocalDateTime fecha,
+                                                    @RequestParam(value = "latenciaMax", required = false) Integer latenciaMax) {
+        return facade.listarScrims().stream()
+                .filter(scrim -> coincide(juego, scrim.getJuego()))
+                .filter(scrim -> coincide(formato, scrim.getFormato()))
+                .filter(scrim -> coincide(region, scrim.getRegion()))
+                .filter(scrim -> rangoMin == null || scrim.getRangoMin() >= rangoMin)
+                .filter(scrim -> rangoMax == null || scrim.getRangoMax() <= rangoMax)
+                .filter(scrim -> fecha == null || scrim.getFechaHora().toLocalDate().equals(fecha.toLocalDate()))
+                .filter(scrim -> latenciaMax == null || scrim.getLatenciaMax() <= latenciaMax)
+                .map(this::toResponse)
+                .toList();
+    }
+
     @PostMapping("/scrims/{scrimId}/postulaciones")
     public ApiDtos.ScrimResponse postular(@PathVariable("scrimId") UUID scrimId,
                                            @RequestBody ApiDtos.PostulacionRequest request) {
@@ -93,6 +114,31 @@ public class ScrimRestController {
     @PostMapping("/scrims/{scrimId}/cancelar")
     public ApiDtos.ScrimResponse cancelar(@PathVariable("scrimId") UUID scrimId) {
         facade.cancelar(scrimId);
+        return toResponse(facade.getScrim(scrimId));
+    }
+
+    @PostMapping("/scrims/{scrimId}/roles/cambiar")
+    public ApiDtos.ScrimResponse cambiarRol(@PathVariable("scrimId") UUID scrimId,
+                                             @RequestBody ApiDtos.CambiarRolRequest request) {
+        facade.cambiarRol(scrimId, usuarios.buscar(request.username()), new Rol(request.nuevoRol()));
+        return toResponse(facade.getScrim(scrimId));
+    }
+
+    @PostMapping("/scrims/{scrimId}/roles/intercambiar")
+    public ApiDtos.ScrimResponse intercambiarRoles(@PathVariable("scrimId") UUID scrimId,
+                                                   @RequestBody ApiDtos.IntercambiarRolesRequest request) {
+        facade.intercambiarRoles(
+                scrimId,
+                usuarios.buscar(request.usernameA()),
+                usuarios.buscar(request.usernameB())
+        );
+        return toResponse(facade.getScrim(scrimId));
+    }
+
+    @PostMapping("/scrims/{scrimId}/suplentes")
+    public ApiDtos.ScrimResponse moverASuplente(@PathVariable("scrimId") UUID scrimId,
+                                                @RequestBody ApiDtos.UsuarioOperacionRequest request) {
+        facade.moverASuplente(scrimId, usuarios.buscar(request.username()));
         return toResponse(facade.getScrim(scrimId));
     }
 
@@ -139,6 +185,10 @@ public class ScrimRestController {
                 .toList();
     }
 
+    private boolean coincide(String filtro, String valor) {
+        return filtro == null || filtro.isBlank() || valor.equalsIgnoreCase(filtro);
+    }
+
     private ApiDtos.ScrimResponse toResponse(ScrimContext scrim) {
         return new ApiDtos.ScrimResponse(
                 scrim.getId(),
@@ -148,7 +198,14 @@ public class ScrimRestController {
                 scrim.getState().getNombre(),
                 scrim.getCuposTotales(),
                 scrim.cuposDisponibles(),
-                scrim.getFechaHora()
+                scrim.getFechaHora(),
+                scrim.getPostulaciones().stream()
+                        .map(postulacion -> new ApiDtos.PostulacionResponse(
+                                postulacion.getUsuario().getUsername(),
+                                postulacion.getRolDeseado().getNombre(),
+                                postulacion.getEstado().getNombre()
+                        ))
+                        .toList()
         );
     }
 

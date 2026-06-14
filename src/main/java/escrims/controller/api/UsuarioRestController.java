@@ -59,8 +59,17 @@ public class UsuarioRestController {
                 usuario.getUsername(),
                 usuario.getEmail(),
                 usuario.getRegion(),
+                usuario.getRangoPorJuego().keySet().stream().findFirst().orElse(""),
+                usuario.getRangoPorJuego().values().stream().findFirst().orElse(0),
                 usuario.getLatenciaPromedio(),
-                usuario.isVerificado()
+                usuario.getRolesPreferidos().stream()
+                        .map(rol -> rol.getNombre())
+                        .toList(),
+                usuario.getDisponibilidad(),
+                usuario.isVerificado(),
+                usuario.getRolSistema(),
+                usuario.getStrikes(),
+                usuario.getCooldownHasta()
         );
     }
 }

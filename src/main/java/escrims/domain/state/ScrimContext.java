@@ -3,11 +3,13 @@ package escrims.domain.state;
 import escrims.domain.matchmaking.MatchmakingStrategy;
 import escrims.domain.model.Confirmacion;
 import escrims.domain.model.Equipo;
+import escrims.domain.model.Estadistica;
 import escrims.domain.model.Postulacion;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 import escrims.infra.events.DomainEvent;
 import escrims.infra.events.DomainEventBus;
+import escrims.infra.events.ScrimStateChangedEvent;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ public class ScrimContext {
     private final List<Equipo> equipos;
     private final List<Postulacion> postulaciones;
     private final List<Confirmacion> confirmaciones;
+    private final List<Estadistica> estadisticas;
 
     private final DomainEventBus eventBus;
     private final MatchmakingStrategy matchmakingStrategy;
@@ -80,6 +83,7 @@ public class ScrimContext {
         this.equipos = new ArrayList<>();
         this.postulaciones = new ArrayList<>();
         this.confirmaciones = new ArrayList<>();
+        this.estadisticas = new ArrayList<>();
 
         this.state = new BuscandoState();
     }
@@ -108,6 +112,10 @@ public class ScrimContext {
         System.out.println("[ScrimContext] Transición: "
                 + state.getNombre() + " → " + nuevoEstado.getNombre());
         this.state = nuevoEstado;
+    }
+
+    public void restaurarEstado(ScrimState estadoPersistido) {
+        this.state = estadoPersistido;
     }
 
     public void publicarEvento(DomainEvent evento) {
@@ -141,6 +149,59 @@ public class ScrimContext {
                 .filter(c -> c.getUsuario().getId().equals(u.getId()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    public void cambiarRol(Usuario usuario, Rol nuevoRol) {
+        validarGestionPreJuego();
+        postulacionAceptadaDe(usuario).cambiarRol(nuevoRol);
+    }
+
+    public void intercambiarRoles(Usuario usuarioA, Usuario usuarioB) {
+        validarGestionPreJuego();
+
+        Postulacion postulacionA = postulacionAceptadaDe(usuarioA);
+        Postulacion postulacionB = postulacionAceptadaDe(usuarioB);
+
+        Rol rolA = postulacionA.getRolDeseado();
+        postulacionA.cambiarRol(postulacionB.getRolDeseado());
+        postulacionB.cambiarRol(rolA);
+    }
+
+    public void moverASuplente(Usuario usuario) {
+        validarGestionPreJuego();
+
+        Postulacion postulacion = postulacionAceptadaDe(usuario);
+        postulacion.marcarSuplente();
+        confirmaciones.removeIf(c -> c.getUsuario().getId().equals(usuario.getId()));
+
+        if (cuposDisponibles() > 0 && !state.getNombre().equals("BUSCANDO")) {
+            String estadoAnterior = state.getNombre();
+            setState(new BuscandoState());
+            publicarEvento(new ScrimStateChangedEvent(
+                    id,
+                    estadoAnterior,
+                    "BUSCANDO"
+            ));
+        }
+    }
+
+    private Postulacion postulacionAceptadaDe(Usuario usuario) {
+        return postulaciones.stream()
+                .filter(Postulacion::estaAceptada)
+                .filter(p -> p.getUsuario().getId().equals(usuario.getId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El usuario " + usuario.getUsername() + " no tiene una postulacion aceptada en este scrim."
+                ));
+    }
+
+    private void validarGestionPreJuego() {
+        String estado = state.getNombre();
+        if (estado.equals("EN_JUEGO") || estado.equals("FINALIZADO") || estado.equals("CANCELADO")) {
+            throw new IllegalStateException(
+                    "No se pueden gestionar roles o suplentes en estado " + estado + "."
+            );
+        }
     }
 
     public UUID getId() {
@@ -197,6 +258,10 @@ public class ScrimContext {
 
     public List<Confirmacion> getConfirmaciones() {
         return confirmaciones;
+    }
+
+    public List<Estadistica> getEstadisticas() {
+        return estadisticas;
     }
 
     public MatchmakingStrategy getMatchmakingStrategy() {

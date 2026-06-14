@@ -18,12 +18,49 @@ public class Usuario {
     private String region;
     private int latenciaPromedio;
     private String disponibilidad;
+    private String rolSistema;
     private int strikes;
     private LocalDateTime cooldownHasta;
     private boolean verificado;
 
     public Usuario(String username, String email, String passwordHash, String region) {
-        this.id = UUID.randomUUID();
+        this(UUID.randomUUID(), username, email, passwordHash, region);
+    }
+
+    public Usuario(UUID id, String username, String email, String passwordHash, String region) {
+        this(id, username, email, passwordHash, region, false);
+    }
+
+    public Usuario(UUID id,
+                   String username,
+                   String email,
+                   String passwordHash,
+                   String region,
+                   boolean verificado) {
+        this(id, username, email, passwordHash, region, verificado, 0, null);
+    }
+
+    public Usuario(UUID id,
+                   String username,
+                   String email,
+                   String passwordHash,
+                   String region,
+                   boolean verificado,
+                   int strikes,
+                   LocalDateTime cooldownHasta) {
+        this(id, username, email, passwordHash, region, verificado, strikes, cooldownHasta, "USER");
+    }
+
+    public Usuario(UUID id,
+                   String username,
+                   String email,
+                   String passwordHash,
+                   String region,
+                   boolean verificado,
+                   int strikes,
+                   LocalDateTime cooldownHasta,
+                   String rolSistema) {
+        this.id = id;
         this.username = username;
         this.email = email;
         this.passwordHash = passwordHash;
@@ -32,9 +69,10 @@ public class Usuario {
         this.rolesPreferidos = new ArrayList<>();
         this.latenciaPromedio = 0;
         this.disponibilidad = "";
-        this.strikes = 0;
-        this.cooldownHasta = null;
-        this.verificado = false;
+        this.rolSistema = rolSistema == null || rolSistema.isBlank() ? "USER" : rolSistema;
+        this.strikes = strikes;
+        this.cooldownHasta = cooldownHasta;
+        this.verificado = verificado;
     }
 
     public UUID getId() {
@@ -55,6 +93,10 @@ public class Usuario {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public Map<String, Integer> getRangoPorJuego() {
@@ -94,11 +136,23 @@ public class Usuario {
     }
 
     public void setDisponibilidad(String disponibilidad) {
-        this.disponibilidad = disponibilidad;
+        this.disponibilidad = disponibilidad == null ? "" : disponibilidad;
+    }
+
+    public String getRolSistema() {
+        return rolSistema;
+    }
+
+    public void setRolSistema(String rolSistema) {
+        this.rolSistema = rolSistema == null || rolSistema.isBlank() ? "USER" : rolSistema;
     }
 
     public int getStrikes() {
         return strikes;
+    }
+
+    public LocalDateTime getCooldownHasta() {
+        return cooldownHasta;
     }
 
     public boolean isVerificado() {
