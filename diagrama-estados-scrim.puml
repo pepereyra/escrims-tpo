@@ -13,7 +13,7 @@ title Diagrama de Estados — Ciclo de Vida del Scrim (eScrims)
 
 state BuscandoJugadores {
     [*] --> Esperando
-    Esperando --> Esperando : postular(usuario, rol)\n[rango y latencia válidos]
+    Esperando --> Esperando : postular(usuario, rol)\n[MatchmakingStrategy compatible]
 }
 
 state LobbyArmado {
@@ -45,7 +45,7 @@ LobbyArmado --> Confirmado : todosConfirmaron()\n[confirmaciones == cuposTotales
 
 LobbyArmado --> Cancelado : cancelar()\n[organizador cancela]\n/ publicar ScrimStateChangedEvent(CANCELADO)
 
-Confirmado --> EnJuego : iniciar()\n[llamada manual del organizador]\n/ publicar ScrimStateChangedEvent(EN_JUEGO)
+Confirmado --> EnJuego : procesarScrimsProgramados()\n[fechaHora alcanzada]\n/ publicar ScrimStateChangedEvent(EN_JUEGO)
 
 Confirmado --> Cancelado : cancelar()\n[organizador cancela]\n/ publicar ScrimStateChangedEvent(CANCELADO)
 
@@ -60,9 +60,10 @@ note right of BuscandoJugadores
   - cancelar()
   
   **Validaciones:**
-  - Rango del usuario dentro de [rangoMin, rangoMax]
-  - Latencia del usuario <= latenciaMax
-  - Usuario verificado y sin cooldown activo
+  - Usuario verificado
+  - Usuario no postulado previamente
+  - MatchmakingStrategy compatible:
+    MMR, latencia e historial
   - Cupos disponibles > 0
 end note
 
@@ -79,14 +80,13 @@ end note
 
 note right of Confirmado
   **Acciones permitidas:**
-  - iniciar() [organizador llama manualmente]
+  - iniciar() [operación interna del service]
+  - procesarScrimsProgramados()
   - cancelar() [solo organizador]
   
   **Regla de negocio:**
-  - El organizador inicia el scrim
-    cuando todos están listos
-  - No hay transición automática por fechaHora
-    en esta versión del sistema
+  - ScrimSchedulerService inicia el scrim
+    cuando fechaHora <= ahora
 end note
 
 note right of EnJuego

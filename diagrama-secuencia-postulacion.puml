@@ -26,8 +26,10 @@ skinparam ArrowColor #4F46E5
 actor       "Usuario (Delta)"       as U
 participant "ScrimFacade"           as SF
 participant "ScrimController"       as SC
+participant "ScrimService"          as SS
 participant "ScrimContext"          as CTX
 participant "BuscandoState"         as BS
+participant "CompositeMatchmaking\nStrategy" as MMS
 participant "Postulacion"           as POST
 participant "Confirmacion"          as CONF
 participant "DomainEventBus"        as BUS
@@ -39,7 +41,7 @@ participant "PushNotificador"       as PUSH
 ' ── Flujo principal ────────────────────────────────────────────────────────────
 == Postulación del 4to jugador (Delta) ==
 
-U -> SF : postular(scrimId, delta, ROL.SUPPORT)
+U -> SF : postular(scrimId, delta, Rol.SUPPORT)
 activate SF
 
 note right of SF
@@ -49,10 +51,13 @@ note right of SF
   (GRASP Low Coupling, SOLID SRP).
 end note
 
-SF -> SC : postular(scrimId, delta, ROL.SUPPORT)
+SF -> SC : postular(scrimId, delta, Rol.SUPPORT)
 activate SC
 
-SC -> CTX : postular(delta, ROL.SUPPORT)
+SC -> SS : postular(scrimId, delta, Rol.SUPPORT)
+activate SS
+
+SS -> CTX : postular(delta, Rol.SUPPORT)
 activate CTX
 
 note right of CTX
@@ -62,27 +67,32 @@ note right of CTX
   lógica interna de cada estado.
 end note
 
-CTX -> BS : postular(ctx, delta, ROL.SUPPORT)
+CTX -> BS : postular(ctx, delta, Rol.SUPPORT)
 activate BS
 
 ' Validaciones
 BS -> BS : validar email verificado ✓
-BS -> BS : validar cooldown inactivo ✓
 BS -> BS : validar no postulado antes ✓
-BS -> BS : validar rango [1400-1700] ✓
-BS -> BS : validar latencia ≤ 80ms ✓
 BS -> BS : validar cupos disponibles > 0 ✓
+BS -> CTX : getMatchmakingStrategy()
+CTX --> BS : MatchmakingStrategy
+BS -> MMS : esCompatible(delta, ctx)
+activate MMS
+MMS --> BS : true\n(MMR + latencia + historial)
+deactivate MMS
 
 note right of BS
-  GRASP Information Expert:
-  BuscandoState conoce todas las
-  reglas de negocio para postular.
+  PATRON STRATEGY:
+  BuscandoState no valida MMR,
+  latencia ni historial directamente.
+  Delega esas reglas en
+  MatchmakingStrategy.
   GRASP Creator: crea Postulacion
   y Confirmacion (las contiene).
 end note
 
 ' Crear Postulacion
-BS -> POST : new Postulacion(delta, ROL.SUPPORT)
+BS -> POST : new Postulacion(delta, Rol.SUPPORT)
 activate POST
 POST --> BS : postulacion
 deactivate POST
@@ -125,7 +135,7 @@ end note
 BS -> CTX : publicarEvento(ScrimStateChangedEvent\n  "BUSCANDO" → "LOBBY_ARMADO")
 activate CTX
 
-CTX -> BUS : publicar(ScrimStateChangedEvent)
+CTX -> BUS : publish(ScrimStateChangedEvent)
 activate BUS
 
 note right of BUS
@@ -137,7 +147,7 @@ end note
 
 == Notificación a los jugadores (Observer + Strategy) ==
 
-BUS -> NS_EMAIL : notificar(ScrimStateChangedEvent)
+BUS -> NS_EMAIL : onEvent(ScrimStateChangedEvent)
 activate NS_EMAIL
 
 note right of NS_EMAIL
@@ -156,7 +166,7 @@ deactivate EMAIL
 NS_EMAIL --> BUS : ok
 deactivate NS_EMAIL
 
-BUS -> NS_PUSH : notificar(ScrimStateChangedEvent)
+BUS -> NS_PUSH : onEvent(ScrimStateChangedEvent)
 activate NS_PUSH
 
 NS_PUSH -> PUSH : enviar("Lobby armado para el scrim de Valorant")
@@ -176,8 +186,11 @@ deactivate CTX
 BS --> CTX : ok
 deactivate BS
 
-CTX --> SC : ok
+CTX --> SS : ok
 deactivate CTX
+
+SS --> SC : ok
+deactivate SS
 
 SC --> SF : ScrimContext (estado = LOBBY_ARMADO)
 deactivate SC

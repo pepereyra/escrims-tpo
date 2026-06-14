@@ -1,142 +1,208 @@
-# eScrims — Sistema de Scrims Competitivos
+# eScrims - Sistema de Scrims Competitivos
 
-TPO Final — Análisis y Diseño Orientado a Objetos  
+TPO Final - Analisis y Diseno Orientado a Objetos  
 Universidad Argentina de la Empresa (UADE)
 
----
+## Descripcion
 
-## 📋 Descripción
+eScrims permite organizar scrims de eSports y gestionar su ciclo de vida:
+creacion, postulaciones, confirmaciones, inicio, finalizacion, estadisticas y
+notificaciones por canal.
 
-eScrims es un sistema que permite a jugadores competitivos organizar **scrims** (partidas de práctica) entre equipos. El sistema gestiona el ciclo de vida completo de un scrim: desde la búsqueda de jugadores hasta el registro de estadísticas y MVP al finalizar.
+La implementacion prioriza una arquitectura defendible para la catedra:
 
----
-
-## 🏗️ Patrones de Diseño Aplicados
-
-| Patrón | Paquete | Propósito |
-|--------|---------|-----------|
-| **State** | `state/` | Ciclo de vida del Scrim (BUSCANDO → LOBBY_ARMADO → CONFIRMADO → EN_JUEGO → FINALIZADO/CANCELADO) |
-| **Observer** | `observer/` | Notificaciones automáticas ante cambios de estado del Scrim |
-| **Strategy** | `strategy/` | Canal de notificación intercambiable (Email, Push, Discord) |
-| **Abstract Factory** | `factory/` | Creación de notificadores según entorno (DEV / PROD) |
-| **Builder** | `state/ScrimBuilder.java` | Construcción de ScrimContext con validación de invariantes |
-
-### Patrones GRASP aplicados
-- **Controller** → `ScrimController`: punto de entrada único para todas las operaciones
-- **Information Expert** → `BuscandoState`: conoce y aplica todas las reglas de postulación
-- **Creator** → `BuscandoState`: crea `Postulacion` y `Confirmacion` (las contiene y registra)
-- **Low Coupling** → `DomainEventBus`: desacopla emisores de receptores de eventos
-- **High Cohesion** → cada clase tiene una única responsabilidad bien definida
-
-### Principios SOLID aplicados
-- **SRP** → cada clase tiene una sola razón para cambiar
-- **OCP** → nuevos estados/notificadores se agregan sin modificar código existente
-- **LSP** → todos los `ScrimState` son intercambiables en `ScrimContext`
-- **ISP** → `Subscriber` y `NotificadorStrategy` son interfaces mínimas y específicas
-- **DIP** → `ScrimContext` depende de `ScrimState` (interfaz), no de estados concretos
-
----
-
-## 📁 Estructura del Proyecto
-
+```text
+Main / API REST -> Facade -> Controller -> Service -> Domain -> Infra
 ```
+
+## Patrones Aplicados
+
+| Patron | Paquete | Proposito |
+| --- | --- | --- |
+| Facade | `escrims.facade` | Expone una API simple para Main/tests y oculta el subsistema interno. |
+| State | `escrims.domain.state` | Ciclo de vida del scrim: BUSCANDO -> LOBBY_ARMADO -> CONFIRMADO -> EN_JUEGO -> FINALIZADO/CANCELADO. |
+| Strategy | `escrims.domain.matchmaking` | Algoritmos intercambiables de matchmaking: MMR, latencia, historial y composicion. |
+| Strategy | `escrims.infra.notification` | Envio intercambiable de notificaciones por Email, Push o Discord. |
+| Observer | `escrims.infra.events` | Publicacion de eventos de dominio y suscriptores desacoplados. |
+| Abstract Factory | `escrims.infra.notification` | Familias DEV/PROD de notificadores. |
+| Adapter | `escrims.infra.notification` | Adapta integraciones externas simuladas a `NotificadorStrategy`. |
+| Builder | `escrims.domain.state.ScrimBuilder` | Construccion incremental de `ScrimContext` con validacion de invariantes. |
+
+## Regla Sin Enums
+
+Los enums fueron eliminados del codigo fuente.
+
+- `Rol` ahora es un value object de dominio en `escrims.domain.model.Rol`.
+- `EstadoPostulacion` y `EstadoNotificacion` son interfaces con implementaciones concretas simples.
+- Los eventos se distinguen por polimorfismo de clases concretas y `getTipo(): String`, sin `TipoEvento`.
+- La configuracion de canales no usa `CanalNotificacion`; la fachada expone metodos explicitos como `configurarNotificacionesEmail()` y `configurarNotificacionesPush()`.
+
+## Estructura
+
+```text
 src/main/java/escrims/
-├── Main.java                          # Punto de entrada — flujo completo 2v2
+├── ApiApplication.java
+├── Main.java
 ├── controller/
-│   └── ScrimController.java           # GRASP Controller — orquesta todas las operaciones
-├── dominio/
-│   ├── Usuario.java                   # Entidad principal con verificación y cooldown
-│   ├── Equipo.java                    # Agrupación de usuarios
-│   ├── Postulacion.java               # Registro de postulación con rol
-│   ├── Confirmacion.java              # Confirmación de asistencia al scrim
-│   ├── Estadistica.java               # KDA y MVP por jugador
-│   ├── Notificacion.java              # Registro de notificaciones enviadas
-│   └── enums/                         # CanalNotificacion, Rol, EstadoPostulacion, etc.
-├── state/                             # PATRON STATE
-│   ├── ScrimState.java                # Interfaz del estado
-│   ├── ScrimContext.java              # Contexto — delega en el estado actual
-│   ├── ScrimBuilder.java              # PATRON BUILDER — construye ScrimContext validado
-│   ├── BuscandoState.java             # Estado inicial — acepta postulaciones
-│   ├── LobbyArmadoState.java          # Cupos completos — acepta confirmaciones
-│   ├── ConfirmadoState.java           # Todos confirmaron — listo para iniciar
-│   ├── EnJuegoState.java              # Scrim en curso
-│   ├── FinalizadoState.java           # Scrim terminado — acepta estadísticas
-│   └── CanceladoState.java            # Estado terminal — no acepta operaciones
-├── observer/                          # PATRON OBSERVER
-│   ├── DomainEvent.java               # Interfaz base de eventos de dominio
-│   ├── DomainEventBus.java            # Bus de eventos — notifica a suscriptores
-│   ├── Subscriber.java                # Interfaz del suscriptor
-│   ├── NotificationSubscriber.java    # Suscriptor que delega en NotificadorStrategy
-│   ├── ScrimStateChangedEvent.java    # Evento: cambio de estado del scrim
-│   └── ScrimCreadoEvent.java          # Evento: scrim recién creado
-├── strategy/                          # PATRON STRATEGY
-│   ├── NotificadorStrategy.java       # Interfaz de notificación
-│   ├── EmailNotificador.java          # Estrategia: envío por email
-│   ├── PushNotificador.java           # Estrategia: push notification
-│   └── DiscordNotificador.java        # Estrategia: mensaje de Discord
-└── factory/                           # PATRON ABSTRACT FACTORY
-    ├── NotificadorFactory.java        # Interfaz de la fábrica
-    ├── DevNotificadorFactory.java     # Fábrica DEV — simula envíos en consola
-    └── ProdNotificadorFactory.java    # Fábrica PROD — envíos reales
-
-src/test/java/escrims/
-└── ScrimFlowTest.java                 # 23 tests — cubre todos los estados y transiciones
+│   ├── ScrimController.java
+│   └── api/
+│       ├── ApiConfig.java
+│       ├── ApiDtos.java
+│       ├── ApiExceptionHandler.java
+│       ├── OpenApiConfig.java
+│       ├── ScrimRestController.java
+│       ├── UsuarioApiRepository.java
+│       └── UsuarioRestController.java
+├── service/
+│   ├── ScrimService.java
+│   └── ScrimSchedulerService.java
+├── facade/
+│   └── ScrimFacade.java
+├── domain/
+│   ├── model/
+│   │   ├── Usuario.java
+│   │   ├── Rol.java
+│   │   ├── Equipo.java
+│   │   ├── Postulacion.java
+│   │   ├── EstadoPostulacion.java
+│   │   ├── Confirmacion.java
+│   │   ├── Estadistica.java
+│   │   ├── Notificacion.java
+│   │   └── EstadoNotificacion.java
+│   ├── state/
+│   │   ├── ScrimContext.java
+│   │   ├── ScrimBuilder.java
+│   │   ├── ScrimState.java
+│   │   ├── BuscandoState.java
+│   │   ├── LobbyArmadoState.java
+│   │   ├── ConfirmadoState.java
+│   │   ├── EnJuegoState.java
+│   │   ├── FinalizadoState.java
+│   │   └── CanceladoState.java
+│   └── matchmaking/
+│       ├── MatchmakingStrategy.java
+│       ├── ByMMRStrategy.java
+│       ├── ByLatencyStrategy.java
+│       ├── ByHistoryStrategy.java
+│       └── CompositeMatchmakingStrategy.java
+└── infra/
+    ├── events/
+    │   ├── DomainEvent.java
+    │   ├── DomainEventBus.java
+    │   ├── Subscriber.java
+    │   ├── NotificationSubscriber.java
+    │   ├── ScrimCreadoEvent.java
+    │   └── ScrimStateChangedEvent.java
+    └── notification/
+        ├── NotificadorStrategy.java
+        ├── EmailNotificador.java
+        ├── PushNotificador.java
+        ├── DiscordNotificador.java
+        ├── SendGridEmailAdapter.java
+        ├── FirebasePushAdapter.java
+        ├── DiscordWebhookAdapter.java
+        ├── NotificadorFactory.java
+        ├── DevNotificadorFactory.java
+        └── ProdNotificadorFactory.java
 ```
 
----
+## Ejecucion
 
-## 📊 Diagramas
+El proyecto usa Maven con Java 17.
 
-| Archivo | Descripción |
-|---------|-------------|
-| `diagrama-clases-escrims.puml` | Diagrama de clases UML completo del dominio |
-| `diagrama-estados-scrim.puml` | Máquina de estados del ciclo de vida del Scrim |
-| `diagrama-secuencia-postulacion.puml` | Secuencia: postulación → transición → notificación |
-
-Abrir con [PlantUML](https://plantuml.com/) o el plugin de PlantUML en IntelliJ IDEA.
-
----
-
-## 🚀 Cómo Ejecutar
-
-### Requisitos
-- Java 17+
-- Maven 3.8+
-
-### Compilar
-```bash
-mvn compile
-```
-
-### Ejecutar el Main (flujo completo 2v2)
-```bash
-mvn exec:java -Dexec.mainClass="escrims.Main"
-```
-
-### Correr los tests
 ```bash
 mvn test
+mvn exec:java
 ```
 
-Resultado esperado: **23 tests, 0 failures, 0 errors**.
+Para levantar la API REST con Spring Boot:
 
----
+```bash
+mvn spring-boot:run
+```
 
-## 🎮 Flujo del Main
+Base URL:
 
-El `Main.java` demuestra el ciclo de vida completo de un scrim 2v2 de Valorant:
+```text
+http://localhost:8080/api
+```
 
-1. **Crear scrim** → estado `BUSCANDO` (rango 1400-1700, latencia ≤ 80ms)
-2. **Configurar notificaciones** → Alpha/Bravo por Email, Charlie/Delta por Push
-3. **Postular 4 jugadores** → al completarse los cupos, transición automática a `LOBBY_ARMADO`
-4. **Confirmar todos** → transición automática a `CONFIRMADO`
-5. **Iniciar** → estado `EN_JUEGO`
-6. **Finalizar** → estado `FINALIZADO`
-7. **Registrar estadísticas** → calcula KDA y determina MVP (Charlie con KDA 7.0)
-8. **Demo de error** → intento de postular en estado `FINALIZADO` lanza `IllegalStateException`
+Swagger UI:
 
----
+```text
+http://localhost:8080/swagger-ui.html
+```
 
-## 📝 Justificación de Patrones
+OpenAPI JSON:
 
-Ver el archivo [`justificacion-patrones-grasp-solid.md`](justificacion-patrones-grasp-solid.md) para la justificación detallada de cada patrón GRASP y principio SOLID aplicado.
+```text
+http://localhost:8080/v3/api-docs
+```
+
+Tambien se puede generar el jar ejecutable:
+
+```bash
+mvn package
+java -jar target/escrims-tpo-1.0.0.jar
+```
+
+## API REST
+
+La API REST funciona como adaptador de entrada: recibe JSON, resuelve DTOs y delega en
+`ScrimFacade`. No saltea la arquitectura interna ni accede directo al dominio.
+
+| Metodo | Endpoint | Uso |
+| --- | --- | --- |
+| POST | `/api/usuarios` | Crear usuario de prueba con juego, rango, latencia y verificacion. |
+| GET | `/api/usuarios` | Listar usuarios cargados en memoria. |
+| POST | `/api/scrims` | Crear scrim. |
+| GET | `/api/scrims/{scrimId}` | Consultar estado del scrim. |
+| POST | `/api/scrims/{scrimId}/postulaciones` | Postular usuario con rol. |
+| POST | `/api/scrims/{scrimId}/confirmaciones` | Confirmar asistencia. |
+| POST | `/api/scrims/scheduler` | Procesar inicio automatico por `fechaHora`. |
+| POST | `/api/scrims/{scrimId}/finalizar` | Finalizar scrim en juego. |
+| POST | `/api/scrims/{scrimId}/estadisticas` | Registrar resultados y calcular MVP. |
+| POST | `/api/notificaciones/email` | Suscribir usuarios a notificaciones por email. |
+| POST | `/api/notificaciones/push` | Suscribir usuarios a notificaciones push. |
+| POST | `/api/notificaciones/discord` | Suscribir usuarios a notificaciones Discord. |
+
+Ejemplo minimo para crear un usuario:
+
+```bash
+curl -X POST http://localhost:8080/api/usuarios \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"Alpha","email":"alpha@mail.com","passwordHash":"hash123","region":"SA","juego":"Valorant","rango":1500,"latencia":30,"verificarEmail":true}'
+```
+
+## Demo del Main
+
+`Main.java` demuestra:
+
+1. Crear un scrim 2v2 de Valorant mediante `ScrimFacade`.
+2. Configurar notificaciones por Email y Push.
+3. Postular cuatro jugadores; `BuscandoState` delega compatibilidad en `MatchmakingStrategy`.
+4. Transicionar automaticamente a `LOBBY_ARMADO`.
+5. Confirmar a todos y pasar a `CONFIRMADO`.
+6. Procesar el scheduler para iniciar automaticamente al llegar `fechaHora`.
+7. Finalizar y registrar estadisticas.
+8. Calcular MVP.
+9. Mostrar una operacion invalida en estado terminal.
+
+## Diagramas
+
+| Archivo | Descripcion |
+| --- | --- |
+| `diagrama-clases-escrims.puml` | Diagrama de clases con estereotipos de patrones. |
+| `diagrama-estados-scrim.puml` | Maquina de estados del scrim. |
+| `diagrama-secuencia-postulacion.puml` | Secuencia de postulacion, State, Observer y Strategy. |
+
+## Evidencias
+
+Se verifico compilacion, tests, API REST y demo con Maven:
+
+```bash
+mvn test
+mvn exec:java
+```
+
+Resultado actual de tests: 57 ejecutados, 0 fallas, 0 errores.

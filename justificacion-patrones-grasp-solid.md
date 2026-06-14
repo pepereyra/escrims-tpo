@@ -5,7 +5,7 @@
 ## 1. PATRONES DE DISEÑO
 
 Los patrones obligatorios según el enunciado son: **State, Strategy, Observer y Facade**.
-El proyecto también aplica **Abstract Factory** y **Builder** como patrones adicionales.
+El proyecto también aplica **Abstract Factory**, **Adapter** y **Builder** como patrones adicionales.
 
 ---
 
@@ -20,11 +20,15 @@ cambio interno impacte en el cliente.
 
 **Cómo se aplica:**
 - `ScrimFacade` encapsula la creación y configuración de todos los subsistemas internos
-  (`DomainEventBus`, `DevNotificadorFactory`, `ScrimController`) en su constructor.
+  (`DomainEventBus`, `DevNotificadorFactory`, `ScrimService`, `ScrimController`) en su constructor.
 - Expone únicamente los métodos de alto nivel que el cliente necesita:
   `crearScrim()`, `postular()`, `confirmar()`, `iniciar()`, `finalizar()`,
-  `cancelar()`, `configurarNotificaciones()`, `registrarEstadisticas()`.
-- El cliente (`Main`) solo conoce `ScrimFacade`. No importa ni instancia
+  `cancelar()`, `configurarNotificacionesEmail()`, `configurarNotificacionesPush()`,
+  `configurarNotificacionesDiscord()`, `procesarScrimsProgramados()`,
+  `registrarEstadisticas()`.
+- El cliente (`Main`) solo conoce `ScrimFacade`. La API REST tambien delega en
+  `ScrimFacade`, por lo que mantiene el mismo punto de entrada al subsistema.
+  No importa ni instancia
   `DomainEventBus`, `NotificadorFactory`, `ScrimBuilder` ni `ScrimController`.
 
 **Ejemplo de uso real (en Main.java):**
@@ -32,13 +36,15 @@ cambio interno impacte en el cliente.
 // El cliente solo conoce ScrimFacade — no sabe nada del subsistema interno
 ScrimFacade facade = new ScrimFacade();
 ScrimContext scrim = facade.crearScrim("Valorant", "2v2", "SA", 1400, 1700, 80, ...);
-facade.configurarNotificaciones(List.of(alpha, bravo), CanalNotificacion.EMAIL);
+facade.configurarNotificacionesEmail(List.of(alpha, bravo));
 facade.postular(scrim.getId(), alpha, Rol.DUELIST);
 ```
 
 **Relación con otros patrones:**
 Internamente, `ScrimFacade` coordina:
 - `ScrimController` (GRASP Controller) → coordina los casos de uso
+- `ScrimService` (Service) → orquesta la lógica de aplicación
+- `ScrimSchedulerService` (Service) → procesa inicios automáticos por `fechaHora`
 - `ScrimBuilder` (Builder) → construye y valida `ScrimContext`
 - `NotificadorFactory` (Abstract Factory) → crea notificadores según entorno
 - `DomainEventBus` (Observer) → publica eventos de dominio
@@ -83,36 +89,39 @@ if (ctx.cuposDisponibles() == 0) {
 
 ---
 
-### 1.3 Patrón STRATEGY — Canal de notificación intercambiable
+### 1.3 Patrón STRATEGY — Matchmaking y canal de notificación intercambiable
 
 **Problema que resuelve:**
-El sistema debe soportar múltiples canales de notificación (Email, Push, Discord) que pueden
-asignarse a distintos usuarios en tiempo de ejecución. Sin este patrón, `NotificationSubscriber`
-tendría condicionales para cada canal, violando OCP.
+El sistema debe soportar algoritmos de matchmaking intercambiables y múltiples canales de
+notificación (Email, Push, Discord). Sin Strategy, el estado `BuscandoState` o el
+`NotificationSubscriber` terminarían con condicionales de rango, latencia, historial o canal,
+violando OCP y SRP.
 
 **Cómo se aplica:**
-- `NotificadorStrategy` es la interfaz que define el contrato:
+- `MatchmakingStrategy` define `esCompatible(Usuario, ScrimContext)`.
+- `ByMMRStrategy`, `ByLatencyStrategy`, `ByHistoryStrategy` y
+  `CompositeMatchmakingStrategy` encapsulan criterios de emparejamiento.
+- `BuscandoState` delega en `ctx.getMatchmakingStrategy().esCompatible(usuario, ctx)`.
+- `NotificadorStrategy` define el contrato:
+  `getCanal(): String` y
   `enviar(Usuario destinatario, Notificacion notificacion): void`.
 - `EmailNotificador`, `PushNotificador` y `DiscordNotificador` son las estrategias concretas,
   cada una con su propio algoritmo de envío encapsulado.
 - `NotificationSubscriber` es el contexto: mantiene una referencia a `NotificadorStrategy`
   y delega el envío en ella. No sabe si está enviando por email, push o Discord.
 
-**Ejemplo de uso real (en ScrimController):**
+**Ejemplo de uso real (en BuscandoState):**
 ```java
-NotificadorStrategy estrategia = switch (canal) {
-    case EMAIL   -> notificadorFactory.crearEmailNotificador();
-    case PUSH    -> notificadorFactory.crearPushNotificador();
-    case DISCORD -> notificadorFactory.crearDiscordNotificador();
-};
-NotificationSubscriber subscriber = new NotificationSubscriber(destinatarios, estrategia, canal);
+if (!ctx.getMatchmakingStrategy().esCompatible(u, ctx)) {
+    throw new IllegalArgumentException("El usuario no cumple con las reglas de matchmaking.");
+}
 ```
 
 **Beneficio clave (OCP):**
 Agregar un nuevo canal (ej: `SlackNotificador`) solo requiere:
 1. Crear `SlackNotificador implements NotificadorStrategy`
-2. Agregar `SLACK` al enum `CanalNotificacion`
-3. Agregar `crearSlackNotificador()` a `NotificadorFactory`
+2. Agregar `crearSlackNotificador()` a `NotificadorFactory`
+3. Exponer un método explícito en la fachada si se quiere una API de alto nivel
 
 No se modifica `NotificationSubscriber`, `DomainEventBus` ni ninguna clase existente.
 
@@ -156,9 +165,9 @@ según el entorno, sin que el código cliente sepa qué implementación concreta
 - `NotificadorFactory` es la interfaz de fábrica abstracta: declara
   `crearEmailNotificador()`, `crearPushNotificador()`, `crearDiscordNotificador()`.
 - `DevNotificadorFactory` crea notificadores que simulan el envío en consola (para dev y tests).
-- `ProdNotificadorFactory` crea notificadores reales (JavaMail/SendGrid, Firebase FCM,
-  Discord webhook) para producción.
-- `ScrimController` recibe `NotificadorFactory` por inyección de dependencia en el constructor.
+- `ProdNotificadorFactory` crea adapters de integración:
+  `SendGridEmailAdapter`, `FirebasePushAdapter`, `DiscordWebhookAdapter`.
+- `ScrimService` recibe `NotificadorFactory` por inyección de dependencia en el constructor.
 - `ScrimFacade` decide qué fábrica usar (por defecto `DevNotificadorFactory`), ocultando
   esta decisión al cliente.
 
@@ -171,7 +180,30 @@ Todo el resto del código permanece igual.
 
 ---
 
-### 1.6 Patrón BUILDER — Construcción incremental de Scrim
+### 1.6 Patrón ADAPTER — Integraciones externas de notificación
+
+**Problema que resuelve:**
+Los proveedores externos como SendGrid, Firebase o Discord Webhook no tienen por qué exponer
+el mismo contrato que nuestro dominio necesita. El sistema interno quiere trabajar con
+`NotificadorStrategy`, pero cada proveedor real suele tener SDKs, parámetros y payloads propios.
+
+**Cómo se aplica:**
+- `SendGridEmailAdapter`, `FirebasePushAdapter` y `DiscordWebhookAdapter` implementan
+  `NotificadorStrategy`.
+- Cada adapter traduce la notificación interna (`Usuario`, `Notificacion`) al formato que
+  usaría el proveedor externo.
+- En esta entrega las llamadas se simulan por consola para no depender de credenciales ni red,
+  pero el punto de integración queda aislado.
+- `ProdNotificadorFactory` crea estos adapters, manteniendo al cliente desacoplado de los
+  detalles de infraestructura.
+
+**Beneficio clave:**
+Si mañana se reemplaza SendGrid por JavaMail o Discord por Slack, se cambia el adapter o la
+fábrica concreta, no el dominio, ni `NotificationSubscriber`, ni `ScrimContext`.
+
+---
+
+### 1.7 Patrón BUILDER — Construcción incremental de Scrim
 
 **Problema que resuelve:**
 `ScrimContext` tiene múltiples parámetros en su constructor. Construirlo directamente es
@@ -219,9 +251,9 @@ ScrimContext scrim = new ScrimBuilder(eventBus)
 | Saber si hay cupos disponibles | `ScrimContext` | Conoce `cuposTotales` y la lista de postulaciones aceptadas |
 | Saber si todos confirmaron | `ScrimContext` | Conoce la lista de confirmaciones y `cuposTotales` |
 | Saber si un usuario está en cooldown | `Usuario` | Conoce `cooldownHasta` y puede comparar con la fecha actual |
-| Validar rango y latencia del candidato | `BuscandoState` | Conoce los límites del scrim y los datos del usuario |
+| Validar compatibilidad del candidato | `MatchmakingStrategy` | Encapsula criterios intercambiables de MMR, latencia e historial |
 | Calcular el KDA | `Estadistica` | Conoce `kills`, `deaths` y `assists` |
-| Determinar el MVP | `ScrimController` | Tiene acceso a todas las estadísticas del scrim |
+| Determinar el MVP | `ScrimService` | Orquesta el caso de uso y tiene acceso a todas las estadísticas calculadas |
 
 ---
 
@@ -237,7 +269,7 @@ agrega, registra o usa objetos de tipo A.
 | `Confirmacion` | `BuscandoState` | Al aceptar la postulación, crea la Confirmacion pendiente asociada |
 | `ScrimStateChangedEvent` | Los estados concretos | Cada estado sabe qué evento publicar al transicionar |
 | `Notificacion` | `NotificationSubscriber` | Tiene el evento y el canal, puede construir la notificación |
-| Notificadores concretos | `NotificadorFactory` | Es la responsabilidad explícita de la fábrica |
+| Notificadores/adapters concretos | `NotificadorFactory` | Es la responsabilidad explícita de la fábrica |
 
 ---
 
@@ -246,19 +278,27 @@ agrega, registra o usa objetos de tipo A.
 **Principio:** Asignar la responsabilidad de recibir y coordinar operaciones del sistema
 a una clase que represente el sistema global o un caso de uso.
 
-- `ScrimController` recibe las peticiones y las delega en `ScrimContext` (State) y en
-  `DomainEventBus` (Observer). No contiene lógica de negocio.
-- Para crear un scrim, `ScrimController` delega en `ScrimBuilder` (Builder), nunca instancia
-  `ScrimContext` directamente.
-- Para configurar notificaciones, `ScrimController` delega en `NotificadorFactory`
+- `ScrimController` recibe las peticiones y las delega en `ScrimService`.
+- `ScrimService` orquesta los casos de uso, usa `ScrimBuilder`, obtiene los scrims y
+  configura notificaciones con `NotificadorFactory`.
+- `ScrimSchedulerService` procesa scrims confirmados cuya `fechaHora` ya fue alcanzada y
+  delega el inicio en `ScrimService`.
+- Para crear un scrim, `ScrimService` delega en `ScrimBuilder` (Builder), nunca instancia
+  `ScrimContext` directamente desde el controller.
+- Para configurar notificaciones, `ScrimService` delega en `NotificadorFactory`
   (Abstract Factory), nunca instancia notificadores concretos.
 - `ScrimFacade` actúa como una capa adicional sobre el Controller, ocultando incluso la
   existencia del Controller al cliente final.
+- `ScrimRestController` y `UsuarioRestController` son controllers de entrada HTTP:
+  convierten JSON/DTOs en llamadas a la fachada o al repositorio de usuarios de la API.
+  No contienen reglas de negocio del scrim.
 
 **Lo que el Controller NO hace:**
 - No accede directamente a `ScrimContext` para cambiar su estado (eso lo hace el patrón State).
 - No instancia `EmailNotificador`, `PushNotificador` ni `DiscordNotificador` directamente.
-- No contiene validaciones de negocio (esas están en los estados concretos y en `ScrimBuilder`).
+- No contiene validaciones de negocio (esas están en `ScrimBuilder`, estados concretos y estrategias).
+- No duplica el flujo REST dentro del dominio: la API llama a `ScrimFacade`, que conserva
+  la secuencia `Controller -> Service -> Domain`.
 
 ---
 
@@ -272,13 +312,17 @@ Decisiones de diseño que reducen el acoplamiento:
    Los notificadores están completamente desacoplados del dominio.
 2. **`NotificationSubscriber` no conoce la fábrica**: recibe un `NotificadorStrategy`
    ya construido. No sabe si es dev o prod.
-3. **`ScrimFacade` oculta el subsistema al cliente**: si el subsistema interno cambia
+3. **Los adapters aíslan proveedores externos**: SendGrid/Firebase/Discord quedan en
+   infraestructura, no en dominio.
+4. **`ScrimFacade` oculta el subsistema al cliente**: si el subsistema interno cambia
    (ej: se reemplaza `DomainEventBus` por otro bus), el cliente no se ve afectado.
-4. **Los estados concretos no se conocen entre sí**: `BuscandoState` no importa
-   `LobbyArmadoState`. La transición se hace a través del contexto con
-   `ctx.setState(new LobbyArmadoState())`.
-5. **`ScrimController` depende de abstracciones**: `NotificadorFactory` (no `DevNotificadorFactory`),
-   `ScrimState` (no `BuscandoState`).
+5. **`BuscandoState` no conoce criterios concretos de matchmaking**: delega en
+   `MatchmakingStrategy`.
+6. **`ScrimService` depende de abstracciones**: `NotificadorFactory`,
+   `NotificadorStrategy` y `MatchmakingStrategy`.
+7. **La API REST no conoce servicios internos**: `ScrimRestController` delega en
+   `ScrimFacade`; si cambia la implementacion de `ScrimService`, el contrato HTTP no
+   necesita cambiar.
 
 ---
 
@@ -290,6 +334,8 @@ responsabilidades fuertemente relacionadas.
 | Clase | Responsabilidad única |
 |---|---|
 | `ScrimFacade` | Solo simplifica el acceso al subsistema de scrims |
+| `ScrimRestController` | Solo traduce requests HTTP a operaciones de la fachada |
+| `UsuarioRestController` | Solo administra usuarios de prueba para la API REST |
 | `BuscandoState` | Solo maneja la lógica del estado "buscando jugadores" |
 | `EmailNotificador` | Solo envía notificaciones por email |
 | `ScrimBuilder` | Solo construye y valida instancias de `ScrimContext` |
@@ -318,6 +364,8 @@ responsabilidad está delegada a su clase correspondiente.
   No cambia si cambia la lógica de negocio de los estados.
 - `ScrimFacade` cambia solo si cambia la API pública del subsistema.
   No cambia si cambia la implementación interna.
+- `ScrimRestController` cambia solo si cambia el contrato HTTP.
+  No cambia si cambia la logica interna de estados, matchmaking o notificaciones.
 
 **Violación evitada:** Si `ScrimContext` tuviera métodos como `enviarEmailAJugadores()` o
 `validarRango()`, tendría múltiples razones para cambiar → violación de SRP.
@@ -331,6 +379,8 @@ responsabilidad está delegada a su clase correspondiente.
 - **Nuevos canales de notificación**: crear `SlackNotificador implements NotificadorStrategy`
   y agregar `crearSlackNotificador()` a `NotificadorFactory`. No se modifica
   `NotificationSubscriber` ni `DomainEventBus`.
+- **Nuevos algoritmos de matchmaking**: crear otra clase que implemente
+  `MatchmakingStrategy` y configurarla en `ScrimBuilder`.
 - **Nuevos tipos de eventos**: crear `ScrimPostulacionRechazadaEvent implements DomainEvent`.
   No se modifica `DomainEventBus`.
 - **Nuevos estados**: crear `SuspendidoState implements ScrimState`.
@@ -363,7 +413,8 @@ esperado y documentado → no viola LSP porque el cliente sabe que puede ocurrir
 
 - `ScrimState` define exactamente los métodos que un estado necesita. No tiene métodos
   de notificación ni de construcción.
-- `NotificadorStrategy` define solo `enviar(Usuario destinatario, Notificacion notificacion): void`.
+- `NotificadorStrategy` define solo `getCanal()` y
+  `enviar(Usuario destinatario, Notificacion notificacion): void`.
   No tiene métodos de suscripción ni de eventos.
 - `Subscriber` define solo `onEvent(DomainEvent)`. No tiene métodos de envío ni de
   construcción de notificaciones.
@@ -379,10 +430,12 @@ de abstracciones.**
 
 | Clase de alto nivel | Depende de (abstracción) | NO depende de (implementación concreta) |
 |---|---|---|
-| `ScrimFacade` | `NotificadorFactory` | `DevNotificadorFactory`, `ProdNotificadorFactory` |
-| `ScrimContext` | `DomainEventBus`, `ScrimState` | `BuscandoState`, `EmailNotificador` |
+| `ScrimFacade` | `NotificadorFactory` | Detalles internos del service/controller |
+| `ScrimRestController` | `ScrimFacade` | `ScrimService`, estados concretos, factories concretas |
+| `ScrimContext` | `DomainEventBus`, `ScrimState`, `MatchmakingStrategy` | `EmailNotificador`, criterios concretos de matchmaking |
 | `NotificationSubscriber` | `NotificadorStrategy` | `PushNotificador`, `EmailNotificador`, `DiscordNotificador` |
-| `ScrimController` | `NotificadorFactory`, `ScrimBuilder` | `DevNotificadorFactory`, `ProdNotificadorFactory` |
+| `ScrimService` | `NotificadorFactory`, `NotificadorStrategy` | `DevNotificadorFactory`, `ProdNotificadorFactory` |
+| `ProdNotificadorFactory` | `NotificadorStrategy` | Cliente de aplicación y dominio |
 
 **Aplicación de DIP en la fábrica:** `NotificationSubscriber` recibe un `NotificadorStrategy`
 por inyección de dependencias (constructor). La decisión de qué `NotificadorStrategy` concreto
@@ -396,9 +449,12 @@ usar la toma `NotificadorFactory`, que está en la capa de infraestructura, no e
 |---|---|---|
 | El cliente accede al sistema por un único punto | **Facade** | Oculta la complejidad del subsistema, bajo acoplamiento cliente-dominio |
 | El estado del scrim se delega a objetos estado | **State** | Elimina condicionales, cada estado es cohesivo |
+| El matchmaking se delega a algoritmos intercambiables | **Strategy** | MMR, latencia e historial cambian sin tocar el estado |
 | El canal de notificación es intercambiable | **Strategy + OCP** | Nuevos canales sin modificar código existente |
 | Las notificaciones se desacoplan del dominio | **Observer + DIP** | El dominio no conoce los canales de notificación |
 | Los notificadores se crean por fábrica según entorno | **Abstract Factory** | Intercambio dev/prod sin cambiar código cliente |
+| Los proveedores externos se aíslan con adapters | **Adapter + DIP** | SendGrid/Firebase/Discord no contaminan dominio |
+| El inicio por fechaHora se procesa fuera del estado | **Service + State** | Simula scheduler sin meter threads ni cron en el dominio |
 | El scrim se construye con validaciones | **Builder + SRP** | Objeto siempre válido, construcción legible |
 | Cada clase tiene una sola responsabilidad | **SRP + High Cohesion** | Fácil de mantener, testear y extender |
 | Las dependencias apuntan a abstracciones | **DIP + Low Coupling** | Bajo acoplamiento entre capas |

@@ -1,13 +1,13 @@
 package escrims;
 
 import escrims.controller.ScrimController;
-import escrims.dominio.Estadistica;
-import escrims.dominio.Usuario;
-import escrims.dominio.enums.CanalNotificacion;
-import escrims.dominio.enums.Rol;
-import escrims.factory.DevNotificadorFactory;
-import escrims.observer.DomainEventBus;
-import escrims.state.ScrimContext;
+import escrims.domain.model.Estadistica;
+import escrims.domain.model.Rol;
+import escrims.domain.model.Usuario;
+import escrims.infra.notification.DevNotificadorFactory;
+import escrims.infra.events.DomainEventBus;
+import escrims.domain.state.ScrimContext;
+import escrims.service.ScrimService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ class ScrimFlowTest {
     void setUp() {
         eventBus = new DomainEventBus();
         // PATRON ABSTRACT FACTORY: en tests usamos DevNotificadorFactory (sin servicios externos)
-        controller = new ScrimController(eventBus, new DevNotificadorFactory());
+        controller = new ScrimController(new ScrimService(eventBus, new DevNotificadorFactory()));
 
         alpha   = crearUsuario("Alpha",   "alpha@mail.com",   "Valorant", 1500, 30);
         bravo   = crearUsuario("Bravo",   "bravo@mail.com",   "Valorant", 1600, 25);
@@ -173,6 +173,36 @@ class ScrimFlowTest {
                 () -> controller.iniciar(scrim.getId()));
     }
 
+    @Test
+    @DisplayName("Scheduler no inicia un scrim confirmado antes de fechaHora")
+    void schedulerNoIniciaAntesDeFechaHora() {
+        LocalDateTime fechaHora = LocalDateTime.now().plusHours(2);
+        ScrimContext scrim = crearScrim2v2(fechaHora);
+
+        postularTodos(scrim);
+        confirmarTodos(scrim);
+
+        int iniciados = controller.procesarScrimsProgramados(fechaHora.minusMinutes(1));
+
+        assertEquals(0, iniciados);
+        assertEquals("CONFIRMADO", scrim.getState().getNombre());
+    }
+
+    @Test
+    @DisplayName("Scheduler inicia automáticamente un scrim confirmado al llegar fechaHora")
+    void schedulerIniciaScrimConfirmadoAlLlegarFechaHora() {
+        LocalDateTime fechaHora = LocalDateTime.now().plusHours(2);
+        ScrimContext scrim = crearScrim2v2(fechaHora);
+
+        postularTodos(scrim);
+        confirmarTodos(scrim);
+
+        int iniciados = controller.procesarScrimsProgramados(fechaHora.plusSeconds(1));
+
+        assertEquals(1, iniciados);
+        assertEquals("EN_JUEGO", scrim.getState().getNombre());
+    }
+
     // ── Tests de finalización ────────────────────────────────────────
 
     @Test
@@ -270,18 +300,22 @@ class ScrimFlowTest {
     @Test
     @DisplayName("Configurar notificaciones registra suscriptores en el EventBus")
     void configurarNotificacionesRegistraSuscriptores() {
-        controller.configurarNotificaciones(List.of(alpha, bravo), CanalNotificacion.EMAIL);
-        controller.configurarNotificaciones(List.of(charlie, delta), CanalNotificacion.PUSH);
+        controller.configurarNotificacionesEmail(List.of(alpha, bravo));
+        controller.configurarNotificacionesPush(List.of(charlie, delta));
         assertEquals(2, eventBus.cantidadSuscriptores());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
 
     private ScrimContext crearScrim2v2() {
+        return crearScrim2v2(LocalDateTime.now().plusHours(2));
+    }
+
+    private ScrimContext crearScrim2v2(LocalDateTime fechaHora) {
         return controller.crearScrim(
                 "Valorant", "2v2", "SA",
                 1400, 1700, 80,
-                LocalDateTime.now().plusHours(2), 30, 4
+                fechaHora, 30, 4
         );
     }
 

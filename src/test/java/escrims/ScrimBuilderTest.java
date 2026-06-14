@@ -1,8 +1,8 @@
 package escrims;
 
-import escrims.observer.DomainEventBus;
-import escrims.state.ScrimBuilder;
-import escrims.state.ScrimContext;
+import escrims.infra.events.DomainEventBus;
+import escrims.domain.state.ScrimBuilder;
+import escrims.domain.state.ScrimContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
