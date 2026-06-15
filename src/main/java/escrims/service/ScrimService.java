@@ -14,12 +14,15 @@ import escrims.domain.state.ScrimContext;
 import escrims.infra.calendar.ICalCalendarAdapter;
 import escrims.infra.events.DomainEventBus;
 import escrims.infra.events.NotificationSubscriber;
+import escrims.infra.notification.NotificationDispatcher;
 import escrims.infra.notification.NotificadorFactory;
 import escrims.infra.notification.NotificadorStrategy;
 import escrims.infra.notification.QueuedNotificationDispatcher;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +54,8 @@ public class ScrimService {
     private final NotificadorFactory notificadorFactory;
     private final ScrimSchedulerService schedulerService;
     private final ScrimReminderService reminderService;
-    private final QueuedNotificationDispatcher notificationDispatcher;
+    private final NotificationDispatcher notificationDispatcher;
+    private final Map<UUID, Deque<ScrimCommand>> commandHistory = new LinkedHashMap<>();
 
     public ScrimService(DomainEventBus eventBus, NotificadorFactory notificadorFactory) {
         this(eventBus, notificadorFactory, new InMemoryScrimRepository());
@@ -60,12 +64,24 @@ public class ScrimService {
     public ScrimService(DomainEventBus eventBus,
                         NotificadorFactory notificadorFactory,
                         ScrimRepository scrimRepository) {
+        this(eventBus, notificadorFactory, scrimRepository, new QueuedNotificationDispatcher());
+    }
+
+    public ScrimService(DomainEventBus eventBus,
+                        NotificadorFactory notificadorFactory,
+                        ScrimRepository scrimRepository,
+                        NotificationDispatcher notificationDispatcher) {
         this.scrimRepository = scrimRepository;
         this.eventBus = eventBus;
         this.notificadorFactory = notificadorFactory;
         this.schedulerService = new ScrimSchedulerService(this);
-        this.reminderService = new ScrimReminderService(this, new ICalCalendarAdapter(), notificadorFactory);
-        this.notificationDispatcher = new QueuedNotificationDispatcher();
+        this.notificationDispatcher = notificationDispatcher;
+        this.reminderService = new ScrimReminderService(
+                this,
+                new ICalCalendarAdapter(),
+                notificadorFactory,
+                notificationDispatcher
+        );
     }
 
     public ScrimContext crearScrim(String juego,
@@ -175,7 +191,19 @@ public class ScrimService {
 
     private void ejecutar(ScrimContext scrim, ScrimCommand command) {
         command.ejecutar();
+        commandHistory.computeIfAbsent(scrim.getId(), id -> new ArrayDeque<>()).push(command);
         scrimRepository.save(scrim);
+    }
+
+    public void deshacerUltimoComando(UUID scrimId) {
+        Deque<ScrimCommand> history = commandHistory.get(scrimId);
+        if (history == null || history.isEmpty()) {
+            throw new IllegalStateException("No hay comandos para deshacer en el scrim " + scrimId + ".");
+        }
+
+        ScrimCommand command = history.pop();
+        command.deshacer();
+        scrimRepository.save(command.getScrim());
     }
 
     public List<Estadistica> registrarEstadisticas(UUID scrimId,
@@ -241,7 +269,8 @@ public class ScrimService {
                                                             NotificadorStrategy estrategia) {
         NotificationSubscriber subscriber = new NotificationSubscriber(
                 new ArrayList<>(destinatarios),
-                estrategia
+                estrategia,
+                notificationDispatcher
         );
 
         eventBus.subscribe(subscriber);

@@ -141,6 +141,10 @@ public class ScrimFacade {
         controller.moverASuplente(scrimId, usuario);
     }
 
+    public void deshacerUltimoComando(UUID scrimId) {
+        controller.deshacerUltimoComando(scrimId);
+    }
+
     public void configurarNotificacionesEmail(List<Usuario> destinatarios) {
         controller.configurarNotificacionesEmail(destinatarios);
     }

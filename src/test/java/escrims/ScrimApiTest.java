@@ -269,6 +269,11 @@ class ScrimApiTest {
                 .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiAlpha')].rol").value(hasItem("SUPPORT")))
                 .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiBravo')].rol").value(hasItem("DUELIST")));
 
+        mvc.perform(post("/api/scrims/{scrimId}/comandos/undo", scrimId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiAlpha')].rol").value(hasItem("DUELIST")))
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiBravo')].rol").value(hasItem("SUPPORT")));
+
         confirmar(scrimId, "ApiAlpha", "LOBBY_ARMADO");
         confirmar(scrimId, "ApiBravo", "LOBBY_ARMADO");
         confirmar(scrimId, "ApiCharlie", "LOBBY_ARMADO");

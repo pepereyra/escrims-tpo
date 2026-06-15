@@ -170,6 +170,21 @@ public class ScrimContext {
                 .orElse(null);
     }
 
+    public void restaurarPostulacion(Usuario usuario, Rol rol, String estado) {
+        postulacionDe(usuario).restaurar(rol, estado);
+    }
+
+    public void restaurarConfirmacion(Confirmacion confirmacion) {
+        if (confirmacion == null) {
+            return;
+        }
+        boolean existe = confirmaciones.stream()
+                .anyMatch(c -> c.getId().equals(confirmacion.getId()));
+        if (!existe) {
+            confirmaciones.add(confirmacion);
+        }
+    }
+
     public void cambiarRol(Usuario usuario, Rol nuevoRol) {
         validarGestionPreJuego();
         postulacionAceptadaDe(usuario).cambiarRol(nuevoRol);
@@ -205,12 +220,23 @@ public class ScrimContext {
     }
 
     private Postulacion postulacionAceptadaDe(Usuario usuario) {
+        return postulacionDe(usuario, true);
+    }
+
+    private Postulacion postulacionDe(Usuario usuario) {
+        return postulacionDe(usuario, false);
+    }
+
+    private Postulacion postulacionDe(Usuario usuario, boolean soloAceptada) {
         return postulaciones.stream()
-                .filter(Postulacion::estaAceptada)
+                .filter(p -> !soloAceptada || p.estaAceptada())
                 .filter(p -> p.getUsuario().getId().equals(usuario.getId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "El usuario " + usuario.getUsername() + " no tiene una postulacion aceptada en este scrim."
+                        "El usuario " + usuario.getUsername()
+                                + (soloAceptada
+                                ? " no tiene una postulacion aceptada en este scrim."
+                                : " no tiene una postulacion en este scrim.")
                 ));
     }
 

@@ -162,6 +162,12 @@ public class ScrimRestController {
         return toResponse(facade.getScrim(scrimId));
     }
 
+    @PostMapping("/scrims/{scrimId}/comandos/undo")
+    public ApiDtos.ScrimResponse deshacerUltimoComando(@PathVariable("scrimId") UUID scrimId) {
+        facade.deshacerUltimoComando(scrimId);
+        return toResponse(facade.getScrim(scrimId));
+    }
+
     @PostMapping("/scrims/{scrimId}/estadisticas")
     public List<ApiDtos.EstadisticaResponse> registrarEstadisticas(
             @PathVariable("scrimId") UUID scrimId,

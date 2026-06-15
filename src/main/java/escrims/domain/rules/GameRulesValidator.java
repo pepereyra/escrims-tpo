@@ -10,35 +10,35 @@ final class GameRulesValidator {
     private GameRulesValidator() {
     }
 
-    static void validarFormato(GameRulesStrategy strategy, String formato) {
-        if (!strategy.formatosPermitidos().contains(normalizar(formato))) {
+    static void validarFormato(GameRulesTemplate template, String formato) {
+        if (!template.formatosPermitidos().contains(normalizar(formato))) {
             throw new IllegalStateException(
-                    "El formato " + formato + " no esta permitido para " + strategy.getJuego()
-                            + ". Formatos permitidos: " + strategy.formatosPermitidos()
+                    "El formato " + formato + " no esta permitido para " + template.getJuego()
+                            + ". Formatos permitidos: " + template.formatosPermitidos()
             );
         }
     }
 
-    static void validarCupos(GameRulesStrategy strategy, String formato, int cuposTotales) {
+    static void validarCupos(GameRulesTemplate template, String formato, int cuposTotales) {
         int cuposEsperados = cuposEsperadosPorFormato(formato);
         if (cuposEsperados > 0 && cuposTotales != cuposEsperados) {
             throw new IllegalStateException(
-                    "El formato " + formato + " de " + strategy.getJuego()
+                    "El formato " + formato + " de " + template.getJuego()
                             + " requiere " + cuposEsperados + " cupos totales."
             );
         }
     }
 
-    static void validarRol(GameRulesStrategy strategy, Rol rol) {
+    static void validarRol(GameRulesTemplate template, Rol rol) {
         if (rol == null) {
             throw new IllegalArgumentException("El rol es obligatorio.");
         }
 
-        if (!strategy.rolesPermitidos().isEmpty()
-                && !strategy.rolesPermitidos().contains(normalizar(rol.getNombre()))) {
+        if (!template.rolesPermitidos().isEmpty()
+                && !template.rolesPermitidos().contains(normalizar(rol.getNombre()))) {
             throw new IllegalArgumentException(
-                    "El rol " + rol.getNombre() + " no esta permitido para " + strategy.getJuego()
-                            + ". Roles permitidos: " + strategy.rolesPermitidos()
+                    "El rol " + rol.getNombre() + " no esta permitido para " + template.getJuego()
+                            + ". Roles permitidos: " + template.rolesPermitidos()
             );
         }
     }

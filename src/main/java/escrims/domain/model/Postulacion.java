@@ -59,6 +59,11 @@ public class Postulacion {
         this.estado = new SuplentePostulacion();
     }
 
+    public void restaurar(Rol rol, String estado) {
+        cambiarRol(rol);
+        this.estado = crearEstado(estado);
+    }
+
     public void cambiarRol(Rol nuevoRol) {
         if (nuevoRol == null) {
             throw new IllegalArgumentException("El rol es obligatorio.");

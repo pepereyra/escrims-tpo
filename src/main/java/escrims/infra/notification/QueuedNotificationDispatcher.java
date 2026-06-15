@@ -6,18 +6,20 @@ import escrims.domain.model.Usuario;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
-public class QueuedNotificationDispatcher {
+public class QueuedNotificationDispatcher implements NotificationDispatcher {
 
     private static final int MAX_ATTEMPTS = 3;
     private static final long BASE_BACKOFF_MILLIS = 200;
 
     private final Queue<NotificationJob> queue = new ArrayDeque<>();
 
+    @Override
     public void enqueue(Usuario destinatario, Notificacion notificacion, NotificadorStrategy notificador) {
         queue.add(new NotificationJob(destinatario, notificacion, notificador));
         drain();
     }
 
+    @Override
     public int pendientes() {
         return queue.size();
     }

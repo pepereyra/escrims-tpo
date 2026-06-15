@@ -6,6 +6,7 @@ import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimContext;
 import escrims.infra.calendar.CalendarAdapter;
+import escrims.infra.notification.NotificationDispatcher;
 import escrims.infra.notification.NotificadorFactory;
 import escrims.infra.notification.NotificadorStrategy;
 import escrims.infra.notification.QueuedNotificationDispatcher;
@@ -21,16 +22,23 @@ public class ScrimReminderService {
     private final ScrimService scrimService;
     private final CalendarAdapter calendarAdapter;
     private final NotificadorFactory notificadorFactory;
-    private final QueuedNotificationDispatcher dispatcher;
+    private final NotificationDispatcher dispatcher;
     private final Set<String> enviados = new HashSet<>();
 
     public ScrimReminderService(ScrimService scrimService,
                                 CalendarAdapter calendarAdapter,
                                 NotificadorFactory notificadorFactory) {
+        this(scrimService, calendarAdapter, notificadorFactory, new QueuedNotificationDispatcher());
+    }
+
+    public ScrimReminderService(ScrimService scrimService,
+                                CalendarAdapter calendarAdapter,
+                                NotificadorFactory notificadorFactory,
+                                NotificationDispatcher dispatcher) {
         this.scrimService = scrimService;
         this.calendarAdapter = calendarAdapter;
         this.notificadorFactory = notificadorFactory;
-        this.dispatcher = new QueuedNotificationDispatcher();
+        this.dispatcher = dispatcher;
     }
 
     public String generarIcal(ScrimContext scrim) {

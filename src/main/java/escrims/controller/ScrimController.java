@@ -104,6 +104,10 @@ public class ScrimController {
         scrimService.moverASuplente(scrimId, usuario);
     }
 
+    public void deshacerUltimoComando(UUID scrimId) {
+        scrimService.deshacerUltimoComando(scrimId);
+    }
+
     public List<Estadistica> registrarEstadisticas(UUID scrimId,
                                                    Map<Usuario, int[]> resultados) {
 
