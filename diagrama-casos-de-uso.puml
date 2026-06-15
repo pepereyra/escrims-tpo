@@ -1,0 +1,94 @@
+@startuml eScrims - Diagrama de Casos de Uso
+
+skinparam actorStyle awesome
+skinparam usecaseFontSize 12
+skinparam packageBackgroundColor #F8F8FF
+skinparam packageBorderColor #AAAAAA
+skinparam usecase {
+  BackgroundColor #DDEEFF
+  BorderColor #336699
+}
+skinparam actor {
+  BackgroundColor #FFFDE7
+  BorderColor #F9A825
+}
+
+left to right direction
+
+' ============================================================
+' ACTORES
+' ============================================================
+
+actor "Jugador" as Jugador
+actor "Organizador" as Organizador
+actor "Moderador" as Moderador
+actor "Sistema\n(Scheduler)" as Sistema
+
+Organizador --|> Jugador
+
+' ============================================================
+' SISTEMA
+' ============================================================
+
+rectangle "eScrims — Sistema de Scrims Competitivos" {
+
+  ' ---- Registro y Autenticación ----
+  package "Registro y Autenticación" {
+    usecase "CU1 - Registrar usuario" as CU1
+    usecase "CU2 - Autenticar usuario" as CU2
+  }
+
+  ' ---- Gestión de Scrims ----
+  package "Gestión de Scrims" {
+    usecase "CU3 - Crear scrim" as CU3
+    usecase "CU4 - Postularse a scrim" as CU4
+    usecase "CU5 - Emparejar y armar lobby" as CU5
+    usecase "CU6 - Confirmar participación" as CU6
+    usecase "CU7 - Iniciar scrim" as CU7
+    usecase "CU8 - Finalizar y cargar estadísticas" as CU8
+    usecase "CU9 - Cancelar scrim" as CU9
+  }
+
+  ' ---- Notificaciones ----
+  package "Notificaciones" {
+    usecase "CU10 - Notificar eventos" as CU10
+  }
+
+  ' ---- Moderación ----
+  package "Moderación" {
+    usecase "CU11 - Moderar reportes" as CU11
+  }
+
+  ' ---- Includes ----
+  CU3 .> CU2 : <<include>>
+  CU4 .> CU2 : <<include>>
+  CU9 .> CU2 : <<include>>
+
+  CU5 .> CU10 : <<include>>
+  CU6 .> CU10 : <<include>>
+  CU7 .> CU10 : <<include>>
+  CU8 .> CU10 : <<include>>
+  CU9 .> CU10 : <<include>>
+
+}
+
+' ============================================================
+' RELACIONES ACTOR → CASO DE USO
+' ============================================================
+
+Jugador --> CU1
+Jugador --> CU2
+Jugador --> CU4
+Jugador --> CU6
+
+Organizador --> CU3
+Organizador --> CU8
+Organizador --> CU9
+
+Sistema --> CU5
+Sistema --> CU7
+Sistema --> CU10
+
+Moderador --> CU11
+
+@enduml
