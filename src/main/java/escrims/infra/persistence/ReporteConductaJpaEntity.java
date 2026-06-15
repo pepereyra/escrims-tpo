@@ -40,6 +40,9 @@ public class ReporteConductaJpaEntity {
     private String sancion;
 
     @Column(nullable = false)
+    private String etapaResolucion;
+
+    @Column(nullable = false)
     private LocalDateTime fechaCreacion;
 
     protected ReporteConductaJpaEntity() {
@@ -53,6 +56,18 @@ public class ReporteConductaJpaEntity {
                                     String estado,
                                     String sancion,
                                     LocalDateTime fechaCreacion) {
+        this(id, scrim, reportante, reportado, motivo, estado, sancion, "SIN_PROCESAR", fechaCreacion);
+    }
+
+    public ReporteConductaJpaEntity(UUID id,
+                                    ScrimJpaEntity scrim,
+                                    UsuarioJpaEntity reportante,
+                                    UsuarioJpaEntity reportado,
+                                    String motivo,
+                                    String estado,
+                                    String sancion,
+                                    String etapaResolucion,
+                                    LocalDateTime fechaCreacion) {
         this.id = id;
         this.scrim = scrim;
         this.reportante = reportante;
@@ -60,6 +75,7 @@ public class ReporteConductaJpaEntity {
         this.motivo = motivo;
         this.estado = estado;
         this.sancion = sancion;
+        this.etapaResolucion = etapaResolucion == null || etapaResolucion.isBlank() ? "SIN_PROCESAR" : etapaResolucion;
         this.fechaCreacion = fechaCreacion;
     }
 
@@ -89,6 +105,10 @@ public class ReporteConductaJpaEntity {
 
     public String getSancion() {
         return sancion;
+    }
+
+    public String getEtapaResolucion() {
+        return etapaResolucion;
     }
 
     public LocalDateTime getFechaCreacion() {

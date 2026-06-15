@@ -48,6 +48,7 @@ public class ScrimBuilder {
     private LocalDateTime fechaHora;
     private int duracionMinutos = -1;
     private int cuposTotales = -1;
+    private String modalidad = "CASUAL";
 
     private MatchmakingStrategy matchmakingStrategy;
 
@@ -102,6 +103,11 @@ public class ScrimBuilder {
         return this;
     }
 
+    public ScrimBuilder modalidad(String modalidad) {
+        this.modalidad = modalidad;
+        return this;
+    }
+
     public ScrimBuilder matchmakingStrategy(MatchmakingStrategy matchmakingStrategy) {
         this.matchmakingStrategy = matchmakingStrategy;
         return this;
@@ -125,11 +131,22 @@ public class ScrimBuilder {
                 fechaHora,
                 duracionMinutos,
                 cuposTotales,
+                modalidad,
                 eventBus,
                 estrategiaFinal
         );
 
-        eventBus.publish(new ScrimCreadoEvent(id, juego, region, formato, cuposTotales));
+        eventBus.publish(new ScrimCreadoEvent(
+                id,
+                juego,
+                region,
+                formato,
+                cuposTotales,
+                rangoMin,
+                rangoMax,
+                latenciaMax,
+                fechaHora
+        ));
 
         return ctx;
     }
@@ -198,5 +215,15 @@ public class ScrimBuilder {
         if (cuposTotales % 2 != 0) {
             throw new IllegalStateException("Los cupos totales deben ser un número par (equipos iguales)");
         }
+
+        if (modalidad == null || modalidad.isBlank()) {
+            modalidad = "CASUAL";
+        }
+
+        String modalidadNormalizada = modalidad.toUpperCase();
+        if (!List.of("RANKED_LIKE", "CASUAL", "PRACTICA").contains(modalidadNormalizada)) {
+            throw new IllegalStateException("La modalidad debe ser RANKED_LIKE, CASUAL o PRACTICA");
+        }
+        modalidad = modalidadNormalizada;
     }
 }

@@ -2,6 +2,8 @@ package escrims.controller.api;
 
 import escrims.domain.model.Feedback;
 import escrims.domain.model.ReporteConducta;
+import escrims.domain.model.Usuario;
+import escrims.service.AuditService;
 import escrims.service.AuthService;
 import escrims.service.ModeracionService;
 import org.springframework.http.HttpStatus;
@@ -24,13 +26,16 @@ public class ModeracionRestController {
     private final ModeracionService moderacionService;
     private final UsuarioApiRepository usuarios;
     private final AuthService authService;
+    private final AuditService auditService;
 
     public ModeracionRestController(ModeracionService moderacionService,
                                     UsuarioApiRepository usuarios,
-                                    AuthService authService) {
+                                    AuthService authService,
+                                    AuditService auditService) {
         this.moderacionService = moderacionService;
         this.usuarios = usuarios;
         this.authService = authService;
+        this.auditService = auditService;
     }
 
     @PostMapping("/scrims/{scrimId}/feedback")
@@ -56,15 +61,19 @@ public class ModeracionRestController {
     @PostMapping("/feedback/{feedbackId}/aprobar")
     public ApiDtos.FeedbackResponse aprobarFeedback(@PathVariable("feedbackId") UUID feedbackId,
                                                     @RequestHeader(value = "Authorization", required = false) String authorization) {
-        authService.requerirRol(authorization, "MOD", "ADMIN");
-        return toResponse(moderacionService.aprobarFeedback(feedbackId));
+        Usuario moderador = authService.requerirRol(authorization, "MOD", "ADMIN");
+        Feedback feedback = moderacionService.aprobarFeedback(feedbackId);
+        auditService.registrar(moderador.getUsername(), "APROBAR_FEEDBACK", "FEEDBACK", feedbackId.toString(), "Feedback aprobado");
+        return toResponse(feedback);
     }
 
     @PostMapping("/feedback/{feedbackId}/rechazar")
     public ApiDtos.FeedbackResponse rechazarFeedback(@PathVariable("feedbackId") UUID feedbackId,
                                                      @RequestHeader(value = "Authorization", required = false) String authorization) {
-        authService.requerirRol(authorization, "MOD", "ADMIN");
-        return toResponse(moderacionService.rechazarFeedback(feedbackId));
+        Usuario moderador = authService.requerirRol(authorization, "MOD", "ADMIN");
+        Feedback feedback = moderacionService.rechazarFeedback(feedbackId);
+        auditService.registrar(moderador.getUsername(), "RECHAZAR_FEEDBACK", "FEEDBACK", feedbackId.toString(), "Feedback rechazado");
+        return toResponse(feedback);
     }
 
     @PostMapping("/scrims/{scrimId}/reportes")
@@ -90,16 +99,20 @@ public class ModeracionRestController {
     public ApiDtos.ReporteConductaResponse aprobarReporte(@PathVariable("reporteId") UUID reporteId,
                                                           @RequestHeader(value = "Authorization", required = false) String authorization,
                                                           @RequestBody(required = false) ApiDtos.ResolverReporteRequest request) {
-        authService.requerirRol(authorization, "MOD", "ADMIN");
+        Usuario moderador = authService.requerirRol(authorization, "MOD", "ADMIN");
         String sancion = request == null ? "" : request.sancion();
-        return toResponse(moderacionService.aprobarReporte(reporteId, sancion));
+        ReporteConducta reporte = moderacionService.aprobarReporte(reporteId, sancion);
+        auditService.registrar(moderador.getUsername(), "APROBAR_REPORTE", "REPORTE", reporteId.toString(), "Reporte aprobado. Sancion: " + sancion);
+        return toResponse(reporte);
     }
 
     @PostMapping("/reportes/{reporteId}/rechazar")
     public ApiDtos.ReporteConductaResponse rechazarReporte(@PathVariable("reporteId") UUID reporteId,
                                                            @RequestHeader(value = "Authorization", required = false) String authorization) {
-        authService.requerirRol(authorization, "MOD", "ADMIN");
-        return toResponse(moderacionService.rechazarReporte(reporteId));
+        Usuario moderador = authService.requerirRol(authorization, "MOD", "ADMIN");
+        ReporteConducta reporte = moderacionService.rechazarReporte(reporteId);
+        auditService.registrar(moderador.getUsername(), "RECHAZAR_REPORTE", "REPORTE", reporteId.toString(), "Reporte rechazado");
+        return toResponse(reporte);
     }
 
     private ApiDtos.FeedbackResponse toResponse(Feedback feedback) {
@@ -124,6 +137,7 @@ public class ModeracionRestController {
                 reporte.getMotivo(),
                 reporte.getEstado().getNombre(),
                 reporte.getSancion(),
+                reporte.getEtapaResolucion(),
                 reporte.getReportado().getStrikes(),
                 reporte.getFechaCreacion()
         );

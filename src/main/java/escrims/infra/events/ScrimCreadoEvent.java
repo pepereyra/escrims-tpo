@@ -20,15 +20,35 @@ public class ScrimCreadoEvent implements DomainEvent {
     private final String region;
     private final String formato;
     private final int cuposTotales;
+    private final int rangoMin;
+    private final int rangoMax;
+    private final int latenciaMax;
+    private final LocalDateTime fechaHora;
     private final LocalDateTime fecha;
 
     public ScrimCreadoEvent(UUID scrimId, String juego, String region,
                              String formato, int cuposTotales) {
+        this(scrimId, juego, region, formato, cuposTotales, 0, 0, 0, LocalDateTime.now());
+    }
+
+    public ScrimCreadoEvent(UUID scrimId,
+                            String juego,
+                            String region,
+                            String formato,
+                            int cuposTotales,
+                            int rangoMin,
+                            int rangoMax,
+                            int latenciaMax,
+                            LocalDateTime fechaHora) {
         this.scrimId = scrimId;
         this.juego = juego;
         this.region = region;
         this.formato = formato;
         this.cuposTotales = cuposTotales;
+        this.rangoMin = rangoMin;
+        this.rangoMax = rangoMax;
+        this.latenciaMax = latenciaMax;
+        this.fechaHora = fechaHora;
         this.fecha = LocalDateTime.now();
     }
 
@@ -63,6 +83,22 @@ public class ScrimCreadoEvent implements DomainEvent {
         return cuposTotales;
     }
 
+    public int getRangoMin() {
+        return rangoMin;
+    }
+
+    public int getRangoMax() {
+        return rangoMax;
+    }
+
+    public int getLatenciaMax() {
+        return latenciaMax;
+    }
+
+    public LocalDateTime getFechaHora() {
+        return fechaHora;
+    }
+
     @Override
     public String toString() {
         return "ScrimCreadoEvent{scrimId=" + scrimId +
@@ -70,6 +106,10 @@ public class ScrimCreadoEvent implements DomainEvent {
                 ", region='" + region + '\'' +
                 ", formato='" + formato + '\'' +
                 ", cuposTotales=" + cuposTotales +
+                ", rangoMin=" + rangoMin +
+                ", rangoMax=" + rangoMax +
+                ", latenciaMax=" + latenciaMax +
+                ", fechaHora=" + fechaHora +
                 ", fecha=" + fecha + '}';
     }
 }

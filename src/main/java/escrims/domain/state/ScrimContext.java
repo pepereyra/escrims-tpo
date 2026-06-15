@@ -43,6 +43,7 @@ public class ScrimContext {
     private final LocalDateTime fechaHora;
     private final int duracionMinutos;
     private final int cuposTotales;
+    private final String modalidad;
 
     private ScrimState state;
 
@@ -66,6 +67,23 @@ public class ScrimContext {
                         int cuposTotales,
                         DomainEventBus eventBus,
                         MatchmakingStrategy matchmakingStrategy) {
+        this(id, juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL", eventBus, matchmakingStrategy);
+    }
+
+    public ScrimContext(UUID id,
+                        String juego,
+                        String formato,
+                        String region,
+                        int rangoMin,
+                        int rangoMax,
+                        int latenciaMax,
+                        LocalDateTime fechaHora,
+                        int duracionMinutos,
+                        int cuposTotales,
+                        String modalidad,
+                        DomainEventBus eventBus,
+                        MatchmakingStrategy matchmakingStrategy) {
 
         this.id = id;
         this.juego = juego;
@@ -77,6 +95,7 @@ public class ScrimContext {
         this.fechaHora = fechaHora;
         this.duracionMinutos = duracionMinutos;
         this.cuposTotales = cuposTotales;
+        this.modalidad = modalidad == null || modalidad.isBlank() ? "CASUAL" : modalidad.toUpperCase();
         this.eventBus = eventBus;
         this.matchmakingStrategy = matchmakingStrategy;
 
@@ -242,6 +261,10 @@ public class ScrimContext {
 
     public int getCuposTotales() {
         return cuposTotales;
+    }
+
+    public String getModalidad() {
+        return modalidad;
     }
 
     public ScrimState getState() {

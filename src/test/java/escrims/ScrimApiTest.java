@@ -160,10 +160,12 @@ class ScrimApiTest {
                                 80,
                                 fechaHora,
                                 30,
-                                4
+                                4,
+                                "RANKED_LIKE"
                         ))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.estado").value("BUSCANDO"))
+                .andExpect(jsonPath("$.modalidad").value("RANKED_LIKE"))
                 .andExpect(jsonPath("$.cuposDisponibles").value(4))
                 .andReturn()
                 .getResponse()
@@ -280,6 +282,61 @@ class ScrimApiTest {
     }
 
     @Test
+    @DisplayName("API REST guarda busquedas favoritas, dispara alertas y expone auditoria")
+    void apiRestGuardaBusquedasFavoritasDisparaAlertasYAuditoria() throws Exception {
+        LocalDateTime fechaHora = LocalDateTime.now().plusHours(4).withNano(0);
+        String token = registrarUsuarioAuth("AlertAlpha", "alert-alpha@mail.com");
+        String adminToken = registrarAdmin("AlertAdmin", "alert-admin@mail.com");
+
+        mvc.perform(post("/api/busquedas-favoritas")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.BusquedaFavoritaRequest(
+                                "AlertGame",
+                                "3v3",
+                                "SA",
+                                1000,
+                                1800,
+                                70,
+                                fechaHora.toLocalDate()
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value("AlertAlpha"))
+                .andExpect(jsonPath("$.juego").value("AlertGame"));
+
+        mvc.perform(post("/api/scrims")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.CrearScrimRequest(
+                                "AlertGame",
+                                "3v3",
+                                "SA",
+                                1200,
+                                1700,
+                                60,
+                                fechaHora,
+                                45,
+                                6
+                        ))))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/api/alertas")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].username").value("AlertAlpha"))
+                .andExpect(jsonPath("$[0].mensaje").value("Nuevo scrim compatible: AlertGame 3v3 en SA"));
+
+        mvc.perform(get("/api/audit")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(get("/api/audit")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.accion == 'SCRIM_CREADO')]").exists());
+    }
+
+    @Test
     @DisplayName("API REST permite feedback y moderacion de reportes")
     void apiRestPermiteFeedbackYModeracionDeReportes() throws Exception {
         LocalDateTime fechaHora = LocalDateTime.now().plusHours(2).withNano(0);
@@ -368,8 +425,76 @@ class ScrimApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.username == 'ApiFeedBravo')].strikes").value(hasItem(1)));
 
+        mvc.perform(post("/api/scrims/{scrimId}/reportes", scrimId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.ReporteConductaRequest(
+                                "ApiFeedAlpha",
+                                "ApiFeedCharlie",
+                                "auto-no-show abandono confirmado"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.estado").value("APROBADO"))
+                .andExpect(jsonPath("$.sancion").value("STRIKE_AUTO_NO_SHOW"))
+                .andExpect(jsonPath("$.etapaResolucion").value("AUTO_RESOLVER"))
+                .andExpect(jsonPath("$.strikesReportado").value(1));
+
         assertEquals(1, countRows("feedback", scrimId));
-        assertEquals(1, countRows("reportes_conducta", scrimId));
+        assertEquals(2, countRows("reportes_conducta", scrimId));
+    }
+
+    @Test
+    @DisplayName("API REST genera iCal y recordatorios automaticos antes del scrim")
+    void apiRestGeneraIcalYRecordatoriosAutomaticos() throws Exception {
+        LocalDateTime fechaHora = LocalDateTime.now().plusHours(2).withNano(0);
+
+        crearUsuario("ApiCalAlpha", "api-cal-alpha@mail.com", 1500, 30);
+        crearUsuario("ApiCalBravo", "api-cal-bravo@mail.com", 1600, 25);
+        crearUsuario("ApiCalCharlie", "api-cal-charlie@mail.com", 1450, 40);
+        crearUsuario("ApiCalDelta", "api-cal-delta@mail.com", 1550, 35);
+
+        String crearScrimResponse = mvc.perform(post("/api/scrims")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.CrearScrimRequest(
+                                "Valorant",
+                                "2v2",
+                                "SA",
+                                1400,
+                                1700,
+                                80,
+                                fechaHora,
+                                30,
+                                4,
+                                "PRACTICA"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.modalidad").value("PRACTICA"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        UUID scrimId = UUID.fromString(read(crearScrimResponse).get("id").asText());
+
+        postular(scrimId, "ApiCalAlpha", "DUELIST", "BUSCANDO");
+        postular(scrimId, "ApiCalBravo", "SUPPORT", "BUSCANDO");
+        postular(scrimId, "ApiCalCharlie", "DUELIST", "BUSCANDO");
+        postular(scrimId, "ApiCalDelta", "SUPPORT", "LOBBY_ARMADO");
+
+        confirmar(scrimId, "ApiCalAlpha", "LOBBY_ARMADO");
+        confirmar(scrimId, "ApiCalBravo", "LOBBY_ARMADO");
+        confirmar(scrimId, "ApiCalCharlie", "LOBBY_ARMADO");
+        confirmar(scrimId, "ApiCalDelta", "CONFIRMADO");
+
+        mvc.perform(get("/api/scrims/{scrimId}/ical", scrimId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido").value(org.hamcrest.Matchers.containsString("BEGIN:VCALENDAR")))
+                .andExpect(jsonPath("$.contenido").value(org.hamcrest.Matchers.containsString("Modalidad PRACTICA")));
+
+        mvc.perform(post("/api/scrims/recordatorios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.RecordatoriosRequest(fechaHora.minusHours(1), 2))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)))
+                .andExpect(jsonPath("$[0].ical").value(org.hamcrest.Matchers.containsString("BEGIN:VCALENDAR")));
     }
 
     @Test
@@ -512,6 +637,24 @@ class ScrimApiTest {
 
         Usuario usuario = usuarioJpaRepository.findByUsername(username).orElseThrow().toDomain();
         usuario.setRolSistema("MOD");
+        usuarioJpaRepository.save(UsuarioJpaEntity.fromDomain(usuario));
+
+        String response = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.LoginRequest(username, "secreto123"))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return read(response).get("token").asText();
+    }
+
+    private String registrarAdmin(String username, String email) throws Exception {
+        registrarUsuarioAuth(username, email);
+
+        Usuario usuario = usuarioJpaRepository.findByUsername(username).orElseThrow().toDomain();
+        usuario.setRolSistema("ADMIN");
         usuarioJpaRepository.save(UsuarioJpaEntity.fromDomain(usuario));
 
         String response = mvc.perform(post("/api/auth/login")

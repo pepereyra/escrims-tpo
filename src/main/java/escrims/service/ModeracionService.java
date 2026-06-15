@@ -1,5 +1,10 @@
 package escrims.service;
 
+import escrims.domain.moderation.AutoResolveReporteHandler;
+import escrims.domain.moderation.BotModerationReporteHandler;
+import escrims.domain.moderation.HumanModerationReporteHandler;
+import escrims.domain.moderation.ReporteModeracionHandler;
+import escrims.domain.moderation.ReporteResolution;
 import escrims.domain.model.Feedback;
 import escrims.domain.model.ReporteConducta;
 import escrims.domain.model.Usuario;
@@ -13,6 +18,7 @@ public class ModeracionService {
     private final ScrimService scrimService;
     private final FeedbackRepository feedbackRepository;
     private final ReporteConductaRepository reporteRepository;
+    private final ReporteModeracionHandler reporteChain;
 
     public ModeracionService(ScrimService scrimService,
                              FeedbackRepository feedbackRepository,
@@ -20,6 +26,11 @@ public class ModeracionService {
         this.scrimService = scrimService;
         this.feedbackRepository = feedbackRepository;
         this.reporteRepository = reporteRepository;
+        AutoResolveReporteHandler auto = new AutoResolveReporteHandler();
+        BotModerationReporteHandler bot = new BotModerationReporteHandler();
+        auto.linkWith(bot);
+        bot.linkWith(new HumanModerationReporteHandler());
+        this.reporteChain = auto;
     }
 
     public Feedback registrarFeedback(UUID scrimId,
@@ -65,7 +76,16 @@ public class ModeracionService {
         validarParticipante(scrim, reportante);
         validarParticipante(scrim, reportado);
 
-        return reporteRepository.save(new ReporteConducta(scrimId, reportante, reportado, motivo));
+        ReporteConducta reporte = new ReporteConducta(scrimId, reportante, reportado, motivo);
+        ReporteResolution resolution = reporteChain.resolver(reporte);
+        reporte.marcarEtapaResolucion(resolution.getEtapa());
+        if (resolution.isResuelto() && resolution.isAprobado()) {
+            reporte.aprobar(resolution.getSancion());
+        } else if (resolution.isResuelto()) {
+            reporte.rechazar();
+        }
+
+        return reporteRepository.save(reporte);
     }
 
     public ReporteConducta aprobarReporte(UUID reporteId, String sancion) {

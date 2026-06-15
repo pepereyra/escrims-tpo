@@ -54,6 +54,7 @@ public class JpaReporteConductaRepositoryAdapter implements ReporteConductaRepos
                 reporte.getMotivo(),
                 reporte.getEstado().getNombre(),
                 reporte.getSancion(),
+                reporte.getEtapaResolucion(),
                 reporte.getFechaCreacion()
         );
     }
@@ -67,6 +68,7 @@ public class JpaReporteConductaRepositoryAdapter implements ReporteConductaRepos
                 entity.getMotivo(),
                 entity.getEstado(),
                 entity.getSancion(),
+                entity.getEtapaResolucion(),
                 entity.getFechaCreacion()
         );
     }

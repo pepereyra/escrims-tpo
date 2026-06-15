@@ -12,10 +12,11 @@ public class ReporteConducta {
     private final String motivo;
     private EstadoModeracion estado;
     private String sancion;
+    private String etapaResolucion;
     private final LocalDateTime fechaCreacion;
 
     public ReporteConducta(UUID scrimId, Usuario reportante, Usuario reportado, String motivo) {
-        this(UUID.randomUUID(), scrimId, reportante, reportado, motivo, "PENDIENTE", "", LocalDateTime.now());
+        this(UUID.randomUUID(), scrimId, reportante, reportado, motivo, "PENDIENTE", "", "SIN_PROCESAR", LocalDateTime.now());
     }
 
     public ReporteConducta(UUID id,
@@ -25,6 +26,18 @@ public class ReporteConducta {
                            String motivo,
                            String estado,
                            String sancion,
+                           LocalDateTime fechaCreacion) {
+        this(id, scrimId, reportante, reportado, motivo, estado, sancion, "SIN_PROCESAR", fechaCreacion);
+    }
+
+    public ReporteConducta(UUID id,
+                           UUID scrimId,
+                           Usuario reportante,
+                           Usuario reportado,
+                           String motivo,
+                           String estado,
+                           String sancion,
+                           String etapaResolucion,
                            LocalDateTime fechaCreacion) {
         if (reportante.getId().equals(reportado.getId())) {
             throw new IllegalArgumentException("Un usuario no puede reportarse a si mismo.");
@@ -40,6 +53,7 @@ public class ReporteConducta {
         this.motivo = motivo;
         this.estado = crearEstado(estado);
         this.sancion = sancion == null ? "" : sancion;
+        this.etapaResolucion = etapaResolucion == null || etapaResolucion.isBlank() ? "SIN_PROCESAR" : etapaResolucion;
         this.fechaCreacion = fechaCreacion == null ? LocalDateTime.now() : fechaCreacion;
     }
 
@@ -52,6 +66,12 @@ public class ReporteConducta {
     public void rechazar() {
         this.estado = new RechazadoModeracion();
         this.sancion = "";
+    }
+
+    public void marcarEtapaResolucion(String etapaResolucion) {
+        this.etapaResolucion = etapaResolucion == null || etapaResolucion.isBlank()
+                ? "SIN_PROCESAR"
+                : etapaResolucion;
     }
 
     public UUID getId() {
@@ -80,6 +100,10 @@ public class ReporteConducta {
 
     public String getSancion() {
         return sancion;
+    }
+
+    public String getEtapaResolucion() {
+        return etapaResolucion;
     }
 
     public LocalDateTime getFechaCreacion() {

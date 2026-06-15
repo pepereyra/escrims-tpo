@@ -35,6 +35,7 @@ public class ScrimJpaEntity {
     private LocalDateTime fechaHora;
     private int duracionMinutos;
     private int cuposTotales;
+    private String modalidad;
 
     @Column(nullable = false)
     private String estado;
@@ -62,8 +63,25 @@ public class ScrimJpaEntity {
                           int duracionMinutos,
                           int cuposTotales,
                           String estado) {
+        this(id, juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL", estado);
+    }
+
+    public ScrimJpaEntity(UUID id,
+                          String juego,
+                          String formato,
+                          String region,
+                          int rangoMin,
+                          int rangoMax,
+                          int latenciaMax,
+                          LocalDateTime fechaHora,
+                          int duracionMinutos,
+                          int cuposTotales,
+                          String modalidad,
+                          String estado) {
         this.id = id;
-        actualizar(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos, cuposTotales, estado);
+        actualizar(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, modalidad, estado);
     }
 
     public void actualizar(String juego,
@@ -76,6 +94,21 @@ public class ScrimJpaEntity {
                            int duracionMinutos,
                            int cuposTotales,
                            String estado) {
+        actualizar(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL", estado);
+    }
+
+    public void actualizar(String juego,
+                           String formato,
+                           String region,
+                           int rangoMin,
+                           int rangoMax,
+                           int latenciaMax,
+                           LocalDateTime fechaHora,
+                           int duracionMinutos,
+                           int cuposTotales,
+                           String modalidad,
+                           String estado) {
         this.juego = juego;
         this.formato = formato;
         this.region = region;
@@ -85,6 +118,7 @@ public class ScrimJpaEntity {
         this.fechaHora = fechaHora;
         this.duracionMinutos = duracionMinutos;
         this.cuposTotales = cuposTotales;
+        this.modalidad = modalidad == null || modalidad.isBlank() ? "CASUAL" : modalidad;
         this.estado = estado;
     }
 
@@ -156,6 +190,10 @@ public class ScrimJpaEntity {
 
     public int getCuposTotales() {
         return cuposTotales;
+    }
+
+    public String getModalidad() {
+        return modalidad;
     }
 
     public String getEstado() {

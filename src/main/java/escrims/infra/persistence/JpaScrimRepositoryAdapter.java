@@ -76,6 +76,7 @@ public class JpaScrimRepositoryAdapter implements ScrimRepository {
                         scrim.getFechaHora(),
                         scrim.getDuracionMinutos(),
                         scrim.getCuposTotales(),
+                        scrim.getModalidad(),
                         scrim.getState().getNombre()
                 ));
 
@@ -89,6 +90,7 @@ public class JpaScrimRepositoryAdapter implements ScrimRepository {
                 scrim.getFechaHora(),
                 scrim.getDuracionMinutos(),
                 scrim.getCuposTotales(),
+                scrim.getModalidad(),
                 scrim.getState().getNombre()
         );
 
@@ -117,6 +119,7 @@ public class JpaScrimRepositoryAdapter implements ScrimRepository {
                 entity.getFechaHora(),
                 entity.getDuracionMinutos(),
                 entity.getCuposTotales(),
+                entity.getModalidad(),
                 eventBus,
                 new CompositeMatchmakingStrategy(List.of(
                         new ByMMRStrategy(),

@@ -5,8 +5,8 @@
 ## 1. PATRONES DE DISEÑO
 
 Los patrones obligatorios según el enunciado son: **State, Strategy, Observer y Facade**.
-El proyecto también aplica **Abstract Factory**, **Adapter**, **Repository**, **Builder** y
-**Command** como patrones adicionales.
+El proyecto también aplica **Abstract Factory**, **Adapter**, **Repository**, **Builder**,
+**Command** y **Chain of Responsibility** como patrones adicionales.
 
 ---
 
@@ -197,10 +197,15 @@ el mismo contrato que nuestro dominio necesita. El sistema interno quiere trabaj
   pero el punto de integración queda aislado.
 - `ProdNotificadorFactory` crea estos adapters, manteniendo al cliente desacoplado de los
   detalles de infraestructura.
+- `ICalCalendarAdapter` adapta el modelo interno de `ScrimContext` a un contenido
+  `VCALENDAR`, consumido por la API REST y por los recordatorios automáticos. De este modo,
+  el dominio no conoce el formato iCal ni detalles de serialización de calendario.
 
 **Beneficio clave:**
 Si mañana se reemplaza SendGrid por JavaMail o Discord por Slack, se cambia el adapter o la
 fábrica concreta, no el dominio, ni `NotificationSubscriber`, ni `ScrimContext`.
+Del mismo modo, si se integra Google Calendar u Outlook, se cambia/agrega un adapter de
+calendario sin modificar el ciclo de vida del scrim.
 
 ---
 
@@ -247,7 +252,8 @@ permite construir el objeto paso a paso con una interfaz fluida y garantiza que 
   `juego("Valorant").formato("2v2").rango(1400, 1700).build()`.
 - El método `build()` llama a `validarInvariantes()` antes de crear el `ScrimContext`,
   garantizando que el objeto resultante siempre sea válido
-  (ej: `rangoMin < rangoMax`, `fechaHora` en el futuro, `cuposTotales > 0` y par).
+  (ej: `rangoMin < rangoMax`, `fechaHora` en el futuro, modalidad permitida,
+  `cuposTotales > 0` y par).
 - `ScrimController` usa `ScrimBuilder` para crear scrims, nunca instancia `ScrimContext`
   directamente.
 - Al finalizar `build()`, el Builder también publica un `ScrimCreadoEvent` en el
@@ -258,6 +264,7 @@ permite construir el objeto paso a paso con una interfaz fluida y garantiza que 
 ScrimContext scrim = new ScrimBuilder(eventBus)
     .juego("Valorant")
     .formato("2v2")
+    .modalidad("PRACTICA")
     .region("SA")
     .rango(1400, 1700)
     .latenciaMax(80)
@@ -301,6 +308,46 @@ duplicar logica en la API. Se agrega un nuevo comando y un metodo de aplicacion 
 
 ---
 
+### 1.10 Patron CHAIN OF RESPONSIBILITY - Resolucion escalonada de reportes
+
+**Problema que resuelve:**
+La moderacion de reportes puede tener reglas simples, analisis automatico y revision humana.
+Si toda esa decision quedara en `ModeracionService`, se acumularian condicionales y cada nueva
+regla obligaria a modificar el mismo metodo.
+
+**Como se aplica:**
+- `ReporteModeracionHandler` define el contrato para procesar un `ReporteConducta`.
+- `AutoResolveReporteHandler` resuelve automaticamente casos simples: por ejemplo,
+  motivos de no-show confirmado o reportes falsos automaticos.
+- `BotModerationReporteHandler` analiza palabras clave de toxicidad/griefing y escala al
+  siguiente nivel cuando requiere criterio humano.
+- `HumanModerationReporteHandler` deja el reporte pendiente en etapa `MODERADOR_HUMANO`.
+- `ModeracionService` arma la cadena `auto-resolver -> bot -> moderador humano` y persiste
+  tanto el estado del reporte como la etapa de resolucion (`AUTO_RESOLVER`,
+  `BOT_ESCALO_A_MODERADOR`, `MODERADOR_HUMANO`).
+
+**Beneficio clave:**
+Agregar un nuevo filtro, por ejemplo deteccion de reincidencia o revision por confianza del
+reportante, implica sumar otro handler a la cadena sin reescribir la logica existente.
+
+---
+
+### 1.11 Auditoria y retry simulados
+
+La auditoria se implementa como un Observer persistente (`AuditService`) que escucha eventos
+de dominio y tambien registra acciones explicitas de moderacion. El retry de notificaciones
+se implementa en `QueuedNotificationDispatcher`, con reintentos exponenciales simulados para
+no depender de proveedores externos ni jobs reales durante la demo. Es una simulacion tecnica:
+queda visible la politica de reintento, los estados y el punto donde se conectaria un worker
+real o una cola externa.
+
+Los recordatorios de scrim, en cambio, tienen un scheduler real de Spring
+(`ScrimReminderScheduler`) que corre periodicamente segun properties y delega en
+`ScrimReminderService`. El endpoint REST de recordatorios queda como disparo manual para demo
+y pruebas, pero la aplicacion tambien los procesa automaticamente mientras esta levantada.
+
+---
+
 ## 2. PATRONES GRASP
 
 ---
@@ -313,10 +360,13 @@ duplicar logica en la API. Se agrega un nuevo comando y un metodo de aplicacion 
 |---|---|---|
 | Saber si hay cupos disponibles | `ScrimContext` | Conoce `cuposTotales` y la lista de postulaciones aceptadas |
 | Saber si todos confirmaron | `ScrimContext` | Conoce la lista de confirmaciones y `cuposTotales` |
+| Saber la modalidad del scrim | `ScrimContext` | Conserva la modalidad elegida: ranked-like, casual o practica |
 | Saber si un usuario está en cooldown | `Usuario` | Conoce `cooldownHasta` y puede comparar con la fecha actual |
 | Validar compatibilidad del candidato | `MatchmakingStrategy` | Encapsula criterios intercambiables de MMR, latencia e historial |
 | Calcular el KDA | `Estadistica` | Conoce `kills`, `deaths` y `assists` |
 | Determinar el MVP | `ScrimService` | Orquesta el caso de uso y tiene acceso a todas las estadísticas calculadas |
+| Generar recordatorios N horas antes | `ScrimReminderService` | Conoce los scrims confirmados, sus participantes y el adapter iCal |
+| Resolver etapa de un reporte | `ReporteModeracionHandler` | Cada handler conoce una regla especifica de moderacion |
 
 ---
 
@@ -332,6 +382,7 @@ agrega, registra o usa objetos de tipo A.
 | `Confirmacion` | `BuscandoState` | Al aceptar la postulación, crea la Confirmacion pendiente asociada |
 | `ScrimStateChangedEvent` | Los estados concretos | Cada estado sabe qué evento publicar al transicionar |
 | `Notificacion` | `NotificationSubscriber` | Tiene el evento y el canal, puede construir la notificación |
+| `RecordatorioScrim` | `ScrimReminderService` | Tiene el scrim, participantes, ventana horaria y contenido iCal |
 | Notificadores/adapters concretos | `NotificadorFactory` | Es la responsabilidad explícita de la fábrica |
 | Snapshots persistentes de scrim | `JpaScrimRepositoryAdapter` | Traduce el agregado de dominio a entidades JPA |
 | Acciones de gestion de roles | `ScrimCommand` concretos | Cada comando contiene los datos y ejecuta una accion especifica |
@@ -348,6 +399,12 @@ a una clase que represente el sistema global o un caso de uso.
   configura notificaciones con `NotificadorFactory`.
 - `ScrimSchedulerService` procesa scrims confirmados cuya `fechaHora` ya fue alcanzada y
   delega el inicio en `ScrimService`.
+- `ScrimReminderService` procesa scrims confirmados dentro de una ventana de N horas,
+  genera iCal con un adapter y despacha recordatorios.
+- `ScrimReminderScheduler` dispara automaticamente ese procesamiento con `@Scheduled`,
+  usando una frecuencia configurable por properties.
+- `ModeracionService` coordina feedback, reportes y la cadena de responsabilidad de
+  resolucion automatica/escalada.
 - Para crear un scrim, `ScrimService` delega en `ScrimBuilder` (Builder), nunca instancia
   `ScrimContext` directamente desde el controller.
 - Para configurar notificaciones, `ScrimService` delega en `NotificadorFactory`
@@ -390,6 +447,9 @@ Decisiones de diseño que reducen el acoplamiento:
    necesita cambiar.
 8. **La persistencia queda en infraestructura**: `ScrimContext` y los estados no conocen
    JPA, H2 ni Spring Data.
+9. **El calendario queda atras de un adapter**: el dominio no conoce el formato iCal.
+10. **La moderacion escalonada queda desacoplada**: `ModeracionService` invoca la interfaz
+   del handler, no las reglas concretas.
 
 ---
 
@@ -407,6 +467,11 @@ responsabilidades fuertemente relacionadas.
 | `CambiarRolCommand` | Solo cambia el rol de un jugador aceptado |
 | `IntercambiarRolesCommand` | Solo intercambia roles entre dos jugadores aceptados |
 | `MoverASuplenteCommand` | Solo mueve un jugador aceptado a suplente |
+| `ScrimReminderService` | Solo genera iCal y recordatorios de scrims confirmados |
+| `ScrimReminderScheduler` | Solo dispara periodicamente el procesamiento de recordatorios |
+| `AutoResolveReporteHandler` | Solo resuelve reportes automaticos simples |
+| `BotModerationReporteHandler` | Solo clasifica reportes que requieren escalamiento |
+| `HumanModerationReporteHandler` | Solo deja la revision pendiente para moderador humano |
 | `BuscandoState` | Solo maneja la lógica del estado "buscando jugadores" |
 | `EmailNotificador` | Solo envía notificaciones por email |
 | `ScrimBuilder` | Solo construye y valida instancias de `ScrimContext` |
@@ -439,6 +504,9 @@ responsabilidad está delegada a su clase correspondiente.
   No cambia si cambia la logica interna de estados, matchmaking o notificaciones.
 - `JpaScrimRepositoryAdapter` cambia solo si cambia la forma de persistir scrims.
   No cambia si cambia una regla de negocio de State.
+- `ScrimReminderService` cambia solo si cambia la politica de recordatorios.
+  No cambia si cambia el formato iCal concreto.
+- Cada handler de moderacion cambia solo si cambia su criterio puntual de resolucion.
 
 **Violación evitada:** Si `ScrimContext` tuviera métodos como `enviarEmailAJugadores()` o
 `validarRango()`, tendría múltiples razones para cambiar → violación de SRP.
@@ -460,6 +528,10 @@ responsabilidad está delegada a su clase correspondiente.
   No se modifica `ScrimContext`.
 - **Nuevo entorno**: crear `StagingNotificadorFactory implements NotificadorFactory`.
   No se modifica `ScrimController` ni `ScrimFacade`.
+- **Nueva integracion de calendario**: crear otro `CalendarAdapter`. No se modifica el
+  dominio ni los estados.
+- **Nueva regla de moderacion**: crear otro `ReporteModeracionHandler` y ubicarlo en la
+  cadena. No se reescribe `ModeracionService`.
 
 ---
 
@@ -508,6 +580,8 @@ de abstracciones.**
 | `ScrimContext` | `DomainEventBus`, `ScrimState`, `MatchmakingStrategy` | `EmailNotificador`, criterios concretos de matchmaking |
 | `NotificationSubscriber` | `NotificadorStrategy` | `PushNotificador`, `EmailNotificador`, `DiscordNotificador` |
 | `ScrimService` | `NotificadorFactory`, `NotificadorStrategy`, `ScrimRepository` | `DevNotificadorFactory`, `ProdNotificadorFactory`, JPA |
+| `ScrimReminderService` | `CalendarAdapter`, `NotificadorFactory` | `ICalCalendarAdapter`, notificadores concretos |
+| `ModeracionService` | `ReporteModeracionHandler` | Handlers concretos de auto-resolver, bot o humano |
 | `ProdNotificadorFactory` | `NotificadorStrategy` | Cliente de aplicación y dominio |
 
 **Aplicación de DIP en la fábrica:** `NotificationSubscriber` recibe un `NotificadorStrategy`
@@ -527,9 +601,14 @@ usar la toma `NotificadorFactory`, que está en la capa de infraestructura, no e
 | Las notificaciones se desacoplan del dominio | **Observer + DIP** | El dominio no conoce los canales de notificación |
 | Los notificadores se crean por fábrica según entorno | **Abstract Factory** | Intercambio dev/prod sin cambiar código cliente |
 | Los proveedores externos se aíslan con adapters | **Adapter + DIP** | SendGrid/Firebase/Discord no contaminan dominio |
+| El calendario iCal se genera atras de una interfaz | **Adapter + DIP** | La API puede exponer iCal sin contaminar el dominio |
 | La persistencia se abstrae como colección de dominio | **Repository + DIP** | JPA, H2 y MySQL quedan en infraestructura |
 | El inicio por fechaHora se procesa fuera del estado | **Service + State** | Simula scheduler sin meter threads ni cron en el dominio |
+| Los recordatorios N horas antes se procesan fuera del dominio | **Service + Adapter** | Ventana horaria e iCal quedan aislados |
+| El disparo automatico de recordatorios queda en un scheduler | **GRASP Controller + SRP** | El scheduling no contamina el dominio ni la API REST |
 | El scrim se construye con validaciones | **Builder + SRP** | Objeto siempre válido, construcción legible |
 | Las acciones de gestion de roles se encapsulan | **Command + SRP** | Cambios, swaps y suplentes quedan como objetos ejecutables |
+| Los reportes pasan por auto-resolver, bot y moderador | **Chain of Responsibility + OCP** | Nuevas reglas se agregan como handlers |
+| Auditoria y retry quedan desacoplados y simulados | **Observer + Service** | Evidencia trazabilidad y reintentos sin proveedores reales |
 | Cada clase tiene una sola responsabilidad | **SRP + High Cohesion** | Fácil de mantener, testear y extender |
 | Las dependencias apuntan a abstracciones | **DIP + Low Coupling** | Bajo acoplamiento entre capas |

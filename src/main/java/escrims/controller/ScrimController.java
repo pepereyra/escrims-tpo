@@ -1,6 +1,7 @@
 package escrims.controller;
 
 import escrims.domain.model.Estadistica;
+import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimContext;
@@ -42,6 +43,20 @@ public class ScrimController {
                                    LocalDateTime fechaHora,
                                    int duracionMinutos,
                                    int cuposTotales) {
+        return crearScrim(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL");
+    }
+
+    public ScrimContext crearScrim(String juego,
+                                   String formato,
+                                   String region,
+                                   int rangoMin,
+                                   int rangoMax,
+                                   int latenciaMax,
+                                   LocalDateTime fechaHora,
+                                   int duracionMinutos,
+                                   int cuposTotales,
+                                   String modalidad) {
 
         return scrimService.crearScrim(
                 juego,
@@ -52,7 +67,8 @@ public class ScrimController {
                 latenciaMax,
                 fechaHora,
                 duracionMinutos,
-                cuposTotales
+                cuposTotales,
+                modalidad
         );
     }
 
@@ -118,6 +134,14 @@ public class ScrimController {
 
     public int procesarScrimsProgramados(LocalDateTime ahora) {
         return scrimService.procesarScrimsProgramados(ahora);
+    }
+
+    public String generarIcal(UUID scrimId) {
+        return scrimService.generarIcal(scrimId);
+    }
+
+    public List<RecordatorioScrim> procesarRecordatorios(LocalDateTime ahora, int horasAntes) {
+        return scrimService.procesarRecordatorios(ahora, horasAntes);
     }
 
     public ScrimContext getScrim(UUID scrimId) {

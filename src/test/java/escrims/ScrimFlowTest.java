@@ -12,7 +12,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,6 +305,24 @@ class ScrimFlowTest {
         controller.configurarNotificacionesEmail(List.of(alpha, bravo));
         controller.configurarNotificacionesPush(List.of(charlie, delta));
         assertEquals(2, eventBus.cantidadSuscriptores());
+    }
+
+    @Test
+    @DisplayName("Matchmaking evalua 500 candidatos en menos de 2 segundos")
+    void matchmakingEvalua500CandidatosEnMenosDe2Segundos() {
+        ScrimContext scrim = crearScrim2v2();
+        List<Usuario> candidatos = new ArrayList<>();
+        for (int i = 0; i < 500; i++) {
+            candidatos.add(crearUsuario("Perf" + i, "perf" + i + "@mail.com", "Valorant", 1500 + (i % 100), 30 + (i % 20)));
+        }
+
+        assertTimeout(Duration.ofSeconds(2), () -> {
+            long compatibles = candidatos.stream()
+                    .filter(usuario -> scrim.getMatchmakingStrategy().esCompatible(usuario, scrim))
+                    .count();
+
+            assertEquals(500, compatibles);
+        });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

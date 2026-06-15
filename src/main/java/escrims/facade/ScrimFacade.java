@@ -2,6 +2,7 @@ package escrims.facade;
 
 import escrims.controller.ScrimController;
 import escrims.domain.model.Estadistica;
+import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimContext;
@@ -79,6 +80,20 @@ public class ScrimFacade {
                                    LocalDateTime fechaHora,
                                    int duracionMinutos,
                                    int cuposTotales) {
+        return crearScrim(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL");
+    }
+
+    public ScrimContext crearScrim(String juego,
+                                   String formato,
+                                   String region,
+                                   int rangoMin,
+                                   int rangoMax,
+                                   int latenciaMax,
+                                   LocalDateTime fechaHora,
+                                   int duracionMinutos,
+                                   int cuposTotales,
+                                   String modalidad) {
 
         return controller.crearScrim(
                 juego,
@@ -89,7 +104,8 @@ public class ScrimFacade {
                 latenciaMax,
                 fechaHora,
                 duracionMinutos,
-                cuposTotales
+                cuposTotales,
+                modalidad
         );
     }
 
@@ -149,6 +165,14 @@ public class ScrimFacade {
 
     public int procesarScrimsProgramados(LocalDateTime ahora) {
         return controller.procesarScrimsProgramados(ahora);
+    }
+
+    public String generarIcal(UUID scrimId) {
+        return controller.generarIcal(scrimId);
+    }
+
+    public List<RecordatorioScrim> procesarRecordatorios(LocalDateTime ahora, int horasAntes) {
+        return controller.procesarRecordatorios(ahora, horasAntes);
     }
 
     public List<Estadistica> registrarEstadisticas(UUID scrimId,

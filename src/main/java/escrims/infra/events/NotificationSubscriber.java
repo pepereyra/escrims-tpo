@@ -3,6 +3,7 @@ package escrims.infra.events;
 import escrims.domain.model.Notificacion;
 import escrims.domain.model.Usuario;
 import escrims.infra.notification.NotificadorStrategy;
+import escrims.infra.notification.QueuedNotificationDispatcher;
 
 import java.util.List;
 
@@ -18,11 +19,19 @@ public class NotificationSubscriber implements Subscriber {
 
     private final List<Usuario> destinatarios;
     private final NotificadorStrategy notificador;
+    private final QueuedNotificationDispatcher dispatcher;
 
     public NotificationSubscriber(List<Usuario> destinatarios,
                                    NotificadorStrategy notificador) {
+        this(destinatarios, notificador, new QueuedNotificationDispatcher());
+    }
+
+    public NotificationSubscriber(List<Usuario> destinatarios,
+                                   NotificadorStrategy notificador,
+                                   QueuedNotificationDispatcher dispatcher) {
         this.destinatarios = destinatarios;
         this.notificador = notificador;
+        this.dispatcher = dispatcher;
     }
 
     @Override
@@ -30,7 +39,7 @@ public class NotificationSubscriber implements Subscriber {
         String payload = buildPayload(evento);
         for (Usuario u : destinatarios) {
             Notificacion notif = new Notificacion(evento.getTipo(), notificador.getCanal(), payload);
-            notificador.enviar(u, notif);
+            dispatcher.enqueue(u, notif, notificador);
         }
     }
 

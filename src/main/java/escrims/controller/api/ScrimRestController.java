@@ -1,6 +1,7 @@
 package escrims.controller.api;
 
 import escrims.domain.model.Estadistica;
+import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimContext;
@@ -45,7 +46,8 @@ public class ScrimRestController {
                 request.latenciaMax(),
                 request.fechaHora(),
                 request.duracionMinutos(),
-                request.cuposTotales()
+                request.cuposTotales(),
+                request.modalidad()
         );
 
         return toResponse(scrim);
@@ -103,6 +105,24 @@ public class ScrimRestController {
                 : request.ahora();
 
         return new ApiDtos.SchedulerResponse(facade.procesarScrimsProgramados(ahora));
+    }
+
+    @GetMapping("/scrims/{scrimId}/ical")
+    public ApiDtos.IcalResponse generarIcal(@PathVariable("scrimId") UUID scrimId) {
+        return new ApiDtos.IcalResponse(scrimId, facade.generarIcal(scrimId));
+    }
+
+    @PostMapping("/scrims/recordatorios")
+    public List<ApiDtos.RecordatorioResponse> procesarRecordatorios(
+            @RequestBody ApiDtos.RecordatoriosRequest request) {
+        LocalDateTime ahora = request == null || request.ahora() == null
+                ? LocalDateTime.now()
+                : request.ahora();
+        int horasAntes = request == null || request.horasAntes() <= 0 ? 1 : request.horasAntes();
+
+        return facade.procesarRecordatorios(ahora, horasAntes).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @PostMapping("/scrims/{scrimId}/finalizar")
@@ -197,6 +217,7 @@ public class ScrimRestController {
                 scrim.getRegion(),
                 scrim.getState().getNombre(),
                 scrim.getCuposTotales(),
+                scrim.getModalidad(),
                 scrim.cuposDisponibles(),
                 scrim.getFechaHora(),
                 scrim.getPostulaciones().stream()
@@ -217,6 +238,17 @@ public class ScrimRestController {
                 estadistica.getAssists(),
                 estadistica.getKda(),
                 estadistica.isMvp()
+        );
+    }
+
+    private ApiDtos.RecordatorioResponse toResponse(RecordatorioScrim recordatorio) {
+        return new ApiDtos.RecordatorioResponse(
+                recordatorio.getScrimId(),
+                recordatorio.getUsername(),
+                recordatorio.getHorasAntes(),
+                recordatorio.getCanal(),
+                recordatorio.getIcal(),
+                recordatorio.getFechaEnvio()
         );
     }
 }

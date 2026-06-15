@@ -1,6 +1,7 @@
 package escrims.controller.api;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,7 +68,26 @@ public final class ApiDtos {
                                     int latenciaMax,
                                     LocalDateTime fechaHora,
                                     int duracionMinutos,
-                                    int cuposTotales) {
+                                    int cuposTotales,
+                                    String modalidad) {
+        public CrearScrimRequest(String juego,
+                                 String formato,
+                                 String region,
+                                 int rangoMin,
+                                 int rangoMax,
+                                 int latenciaMax,
+                                 LocalDateTime fechaHora,
+                                 int duracionMinutos,
+                                 int cuposTotales) {
+            this(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                    cuposTotales, "CASUAL");
+        }
+
+        public CrearScrimRequest {
+            if (modalidad == null || modalidad.isBlank()) {
+                modalidad = "CASUAL";
+            }
+        }
     }
 
     public record PostulacionRequest(String username, String rol) {
@@ -86,6 +106,20 @@ public final class ApiDtos {
     }
 
     public record SchedulerRequest(LocalDateTime ahora) {
+    }
+
+    public record RecordatoriosRequest(LocalDateTime ahora, int horasAntes) {
+    }
+
+    public record RecordatorioResponse(UUID scrimId,
+                                       String username,
+                                       int horasAntes,
+                                       String canal,
+                                       String ical,
+                                       LocalDateTime fechaEnvio) {
+    }
+
+    public record IcalResponse(UUID scrimId, String contenido) {
     }
 
     public record EstadisticaInput(String username, int kills, int deaths, int assists) {
@@ -113,6 +147,44 @@ public final class ApiDtos {
     public record ResolverReporteRequest(String sancion) {
     }
 
+    public record BusquedaFavoritaRequest(String juego,
+                                          String formato,
+                                          String region,
+                                          Integer rangoMin,
+                                          Integer rangoMax,
+                                          Integer latenciaMax,
+                                          LocalDate fecha) {
+    }
+
+    public record BusquedaFavoritaResponse(UUID id,
+                                           String username,
+                                           String juego,
+                                           String formato,
+                                           String region,
+                                           Integer rangoMin,
+                                           Integer rangoMax,
+                                           Integer latenciaMax,
+                                           LocalDate fecha,
+                                           LocalDateTime fechaCreacion) {
+    }
+
+    public record AlertaBusquedaResponse(UUID id,
+                                         UUID busquedaId,
+                                         String username,
+                                         UUID scrimId,
+                                         String mensaje,
+                                         LocalDateTime fechaCreacion) {
+    }
+
+    public record AuditLogResponse(UUID id,
+                                   String actor,
+                                   String accion,
+                                   String entidadTipo,
+                                   String entidadId,
+                                   String detalle,
+                                   LocalDateTime fecha) {
+    }
+
     public record ReporteConductaResponse(UUID id,
                                           UUID scrimId,
                                           String reportante,
@@ -120,6 +192,7 @@ public final class ApiDtos {
                                           String motivo,
                                           String estado,
                                           String sancion,
+                                          String etapaResolucion,
                                           int strikesReportado,
                                           LocalDateTime fechaCreacion) {
     }
@@ -138,6 +211,7 @@ public final class ApiDtos {
                                 String region,
                                 String estado,
                                 int cuposTotales,
+                                String modalidad,
                                 int cuposDisponibles,
                                 LocalDateTime fechaHora,
                                 List<PostulacionResponse> postulaciones) {

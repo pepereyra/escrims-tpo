@@ -23,12 +23,14 @@ Main / API REST -> Facade -> Controller -> Service -> Domain -> Infra
 | State | `escrims.domain.state` | Ciclo de vida del scrim: BUSCANDO -> LOBBY_ARMADO -> CONFIRMADO -> EN_JUEGO -> FINALIZADO/CANCELADO. |
 | Strategy | `escrims.domain.matchmaking` | Algoritmos intercambiables de matchmaking: MMR, latencia, historial y composicion. |
 | Strategy | `escrims.infra.notification` | Envio intercambiable de notificaciones por Email, Push o Discord. |
-| Observer | `escrims.infra.events` | Publicacion de eventos de dominio y suscriptores desacoplados. |
+| Observer | `escrims.infra.events` | Publicacion de eventos de dominio y suscriptores desacoplados para notificaciones, alertas y auditoria. |
 | Abstract Factory | `escrims.infra.notification` | Familias DEV/PROD de notificadores. |
 | Adapter | `escrims.infra.notification` | Adapta integraciones externas simuladas a `NotificadorStrategy`. |
+| Adapter | `escrims.infra.calendar` | Genera invitaciones iCal desde el modelo interno de scrims. |
 | Repository | `escrims.service` / `escrims.infra.persistence` | Desacopla el dominio de la persistencia JPA sobre H2 o MySQL. |
 | Builder | `escrims.domain.state.ScrimBuilder` | Construccion incremental de `ScrimContext` con validacion de invariantes. |
 | Command | `escrims.domain.command` | Encapsula acciones de gestion de roles y suplentes del scrim. |
+| Chain of Responsibility | `escrims.domain.moderation` | Procesa reportes con auto-resolver, bot y moderador humano. |
 
 ## Regla Sin Enums
 
@@ -51,6 +53,8 @@ src/main/java/escrims/
 │       ├── ApiConfig.java
 │       ├── ApiDtos.java
 │       ├── ApiExceptionHandler.java
+│       ├── AuditRestController.java
+│       ├── BusquedaFavoritaRestController.java
 │       ├── ModeracionRestController.java
 │       ├── OpenApiConfig.java
 │       ├── ScrimRestController.java
@@ -60,6 +64,12 @@ src/main/java/escrims/
 │   ├── ScrimRepository.java
 │   ├── FeedbackRepository.java
 │   ├── ReporteConductaRepository.java
+│   ├── BusquedaFavoritaRepository.java
+│   ├── AlertaBusquedaRepository.java
+│   ├── AuditLogRepository.java
+│   ├── BusquedaFavoritaService.java
+│   ├── AuditService.java
+│   ├── ScrimReminderService.java
 │   ├── InMemoryScrimRepository.java
 │   ├── ModeracionService.java
 │   ├── ScrimService.java
@@ -77,6 +87,10 @@ src/main/java/escrims/
 │   │   ├── Estadistica.java
 │   │   ├── Feedback.java
 │   │   ├── ReporteConducta.java
+│   │   ├── BusquedaFavorita.java
+│   │   ├── AlertaBusqueda.java
+│   │   ├── AuditLog.java
+│   │   ├── RecordatorioScrim.java
 │   │   ├── EstadoModeracion.java
 │   │   ├── Notificacion.java
 │   │   └── EstadoNotificacion.java
@@ -95,6 +109,11 @@ src/main/java/escrims/
 │   │   ├── CambiarRolCommand.java
 │   │   ├── IntercambiarRolesCommand.java
 │   │   └── MoverASuplenteCommand.java
+│   ├── moderation/
+│   │   ├── ReporteModeracionHandler.java
+│   │   ├── AutoResolveReporteHandler.java
+│   │   ├── BotModerationReporteHandler.java
+│   │   └── HumanModerationReporteHandler.java
 │   └── matchmaking/
 │       ├── MatchmakingStrategy.java
 │       ├── ByMMRStrategy.java
@@ -102,6 +121,9 @@ src/main/java/escrims/
 │       ├── ByHistoryStrategy.java
 │       └── CompositeMatchmakingStrategy.java
 └── infra/
+    ├── calendar/
+    │   ├── CalendarAdapter.java
+    │   └── ICalCalendarAdapter.java
     ├── events/
     │   ├── DomainEvent.java
     │   ├── DomainEventBus.java
@@ -114,6 +136,7 @@ src/main/java/escrims/
         ├── EmailNotificador.java
         ├── PushNotificador.java
         ├── DiscordNotificador.java
+        ├── QueuedNotificationDispatcher.java
         ├── SendGridEmailAdapter.java
         ├── FirebasePushAdapter.java
         ├── DiscordWebhookAdapter.java
@@ -134,6 +157,9 @@ src/main/java/escrims/
         ├── SpringDataReporteConductaJpaRepository.java
         ├── JpaFeedbackRepositoryAdapter.java
         ├── JpaReporteConductaRepositoryAdapter.java
+        ├── JpaBusquedaFavoritaRepositoryAdapter.java
+        ├── JpaAlertaBusquedaRepositoryAdapter.java
+        ├── JpaAuditLogRepositoryAdapter.java
         └── JpaScrimRepositoryAdapter.java
 ```
 
@@ -199,7 +225,31 @@ MYSQL_PASSWORD
 JWT_SECRET
 RATE_LIMIT_MAX_REQUESTS
 RATE_LIMIT_WINDOW_MILLIS
+REMINDERS_SCHEDULER_ENABLED
+REMINDERS_HORAS_ANTES
+REMINDERS_INITIAL_DELAY_MILLIS
+REMINDERS_FIXED_DELAY_MILLIS
+DEMO_DATA_ENABLED
 ```
+
+Docker Compose activa `DEMO_DATA_ENABLED=true`, por lo que al levantar la API se precargan
+usuarios y scrims demo si la base esta vacia. Todos los usuarios demo tienen password
+`12345678`:
+
+```text
+admin    rol ADMIN
+mod      rol MOD
+alpha    rol USER
+bravo    rol USER
+charlie  rol USER
+delta    rol USER
+echo     rol USER
+foxtrot  rol USER
+```
+
+Tambien se crea un scrim confirmado de Valorant dentro de las proximas 2 horas para probar
+recordatorios automaticos, iCal y flujo de participantes, y un scrim casual de LoL en estado
+BUSCANDO.
 
 Base URL:
 
@@ -245,7 +295,8 @@ java -jar target/escrims-tpo-1.0.0.jar
 La API REST funciona como adaptador de entrada: recibe JSON, resuelve DTOs y delega en
 `ScrimFacade`. No saltea la arquitectura interna ni accede directo al dominio.
 
-En modo API, usuarios, scrims, postulaciones, confirmaciones, estadisticas, feedback y reportes se persisten con
+En modo API, usuarios, scrims, postulaciones, confirmaciones, estadisticas, feedback, reportes,
+busquedas favoritas, alertas y auditoria se persisten con
 Spring Data JPA. Por defecto se usa H2 en memoria; con el perfil `mysql` se usa la base MySQL
 levantada por Docker Compose. El dominio no esta anotado con JPA: se usa un adapter de
 infraestructura que implementa `ScrimRepository`.
@@ -255,6 +306,19 @@ JWT para login, roles de sistema `USER`, `MOD` y `ADMIN`, y rate limiting fijo s
 Los endpoints de resolucion de moderacion requieren `Authorization: Bearer <token>` con rol
 `MOD` o `ADMIN`.
 
+Las busquedas favoritas se registran por usuario autenticado. Cuando se publica un
+`ScrimCreadoEvent`, `BusquedaFavoritaService` actua como Observer, compara el nuevo scrim contra
+las busquedas guardadas y genera alertas persistidas. Las notificaciones usan una cola simulada
+con reintentos exponenciales antes de marcar una notificacion como fallida. La auditoria registra
+cambios de estado y acciones de moderacion.
+
+El scrim modela modalidad (`RANKED_LIKE`, `CASUAL`, `PRACTICA`). Para calendario, se expone
+un adapter iCal y un scheduler Spring que procesa recordatorios N horas antes y envia
+notificaciones simuladas a los participantes confirmados. Tambien existe un endpoint manual
+para disparar el procesamiento durante la demo. La moderacion de reportes pasa por una cadena
+auto-resolver -> bot -> moderador humano; los casos auto-resueltos se aprueban o rechazan
+sin intervencion manual y el resto queda pendiente con la etapa registrada.
+
 | Metodo | Endpoint | Uso |
 | --- | --- | --- |
 | POST | `/api/auth/register` | Registrar usuario con contraseña hasheada y emitir JWT. |
@@ -262,6 +326,9 @@ Los endpoints de resolucion de moderacion requieren `Authorization: Bearer <toke
 | GET | `/api/auth/me` | Consultar usuario autenticado con `Authorization: Bearer <token>`. |
 | POST | `/api/auth/me/verificar-email` | Pasar email de pendiente a verificado. |
 | PUT | `/api/auth/me/perfil` | Editar perfil: juego, rango, roles, region, latencia y disponibilidad. |
+| POST | `/api/busquedas-favoritas` | Guardar una busqueda favorita del usuario autenticado. |
+| GET | `/api/busquedas-favoritas` | Listar busquedas favoritas del usuario autenticado. |
+| GET | `/api/alertas` | Listar alertas generadas por scrims compatibles con las busquedas favoritas. |
 | POST | `/api/usuarios` | Crear usuario de prueba con juego, rango, latencia y verificacion. |
 | GET | `/api/usuarios` | Listar usuarios persistidos. |
 | POST | `/api/scrims` | Crear scrim. |
@@ -269,6 +336,8 @@ Los endpoints de resolucion de moderacion requieren `Authorization: Bearer <toke
 | GET | `/api/scrims/{scrimId}` | Consultar estado del scrim. |
 | POST | `/api/scrims/{scrimId}/postulaciones` | Postular usuario con rol. |
 | POST | `/api/scrims/{scrimId}/confirmaciones` | Confirmar asistencia. |
+| GET | `/api/scrims/{scrimId}/ical` | Descargar/generar el contenido iCal del scrim. |
+| POST | `/api/scrims/recordatorios` | Procesar recordatorios automaticos N horas antes para scrims confirmados. |
 | POST | `/api/scrims/scheduler` | Procesar inicio automatico por `fechaHora`. |
 | POST | `/api/scrims/{scrimId}/finalizar` | Finalizar scrim en juego. |
 | POST | `/api/scrims/{scrimId}/roles/cambiar` | Cambiar el rol asignado a un jugador aceptado. |
@@ -283,6 +352,7 @@ Los endpoints de resolucion de moderacion requieren `Authorization: Bearer <toke
 | GET | `/api/scrims/{scrimId}/reportes` | Listar reportes del scrim. |
 | POST | `/api/reportes/{reporteId}/aprobar` | Aprobar reporte, registrar sancion y sumar strike al reportado. Requiere rol `MOD` o `ADMIN`. |
 | POST | `/api/reportes/{reporteId}/rechazar` | Rechazar reporte pendiente. Requiere rol `MOD` o `ADMIN`. |
+| GET | `/api/audit` | Consultar logs de auditoria. Requiere rol `ADMIN`. |
 | POST | `/api/notificaciones/email` | Suscribir usuarios a notificaciones por email. |
 | POST | `/api/notificaciones/push` | Suscribir usuarios a notificaciones push. |
 | POST | `/api/notificaciones/discord` | Suscribir usuarios a notificaciones Discord. |
@@ -319,11 +389,12 @@ curl -X POST http://localhost:8080/api/usuarios \
 
 ## Evidencias
 
-Se verifico compilacion, tests, API REST y demo con Maven:
+Se verifico compilacion, tests, API REST, seguridad, alertas, auditoria, iCal,
+recordatorios, moderacion automatica y demo con Maven:
 
 ```bash
 mvn test
 mvn exec:java
 ```
 
-Resultado actual de tests: 57 ejecutados, 0 fallas, 0 errores.
+Resultado actual de tests: 70 ejecutados, 0 fallas, 0 errores.

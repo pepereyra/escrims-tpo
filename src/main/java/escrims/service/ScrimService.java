@@ -5,14 +5,18 @@ import escrims.domain.command.IntercambiarRolesCommand;
 import escrims.domain.command.MoverASuplenteCommand;
 import escrims.domain.command.ScrimCommand;
 import escrims.domain.model.Estadistica;
+import escrims.domain.model.Notificacion;
+import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimBuilder;
 import escrims.domain.state.ScrimContext;
+import escrims.infra.calendar.ICalCalendarAdapter;
 import escrims.infra.events.DomainEventBus;
 import escrims.infra.events.NotificationSubscriber;
 import escrims.infra.notification.NotificadorFactory;
 import escrims.infra.notification.NotificadorStrategy;
+import escrims.infra.notification.QueuedNotificationDispatcher;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -46,6 +50,8 @@ public class ScrimService {
     private final DomainEventBus eventBus;
     private final NotificadorFactory notificadorFactory;
     private final ScrimSchedulerService schedulerService;
+    private final ScrimReminderService reminderService;
+    private final QueuedNotificationDispatcher notificationDispatcher;
 
     public ScrimService(DomainEventBus eventBus, NotificadorFactory notificadorFactory) {
         this(eventBus, notificadorFactory, new InMemoryScrimRepository());
@@ -58,6 +64,8 @@ public class ScrimService {
         this.eventBus = eventBus;
         this.notificadorFactory = notificadorFactory;
         this.schedulerService = new ScrimSchedulerService(this);
+        this.reminderService = new ScrimReminderService(this, new ICalCalendarAdapter(), notificadorFactory);
+        this.notificationDispatcher = new QueuedNotificationDispatcher();
     }
 
     public ScrimContext crearScrim(String juego,
@@ -69,6 +77,20 @@ public class ScrimService {
                                    LocalDateTime fechaHora,
                                    int duracionMinutos,
                                    int cuposTotales) {
+        return crearScrim(juego, formato, region, rangoMin, rangoMax, latenciaMax, fechaHora, duracionMinutos,
+                cuposTotales, "CASUAL");
+    }
+
+    public ScrimContext crearScrim(String juego,
+                                   String formato,
+                                   String region,
+                                   int rangoMin,
+                                   int rangoMax,
+                                   int latenciaMax,
+                                   LocalDateTime fechaHora,
+                                   int duracionMinutos,
+                                   int cuposTotales,
+                                   String modalidad) {
 
         ScrimContext scrim = new ScrimBuilder(eventBus)
                 .juego(juego)
@@ -79,6 +101,7 @@ public class ScrimService {
                 .fechaHora(fechaHora)
                 .duracionMinutos(duracionMinutos)
                 .cuposTotales(cuposTotales)
+                .modalidad(modalidad)
                 .build();
 
         scrimRepository.save(scrim);
@@ -131,6 +154,23 @@ public class ScrimService {
     public void moverASuplente(UUID scrimId, Usuario usuario) {
         ScrimContext scrim = getScrim(scrimId);
         ejecutar(scrim, new MoverASuplenteCommand(scrim, usuario));
+        notificarListaEspera(scrim, usuario);
+    }
+
+    private void notificarListaEspera(ScrimContext scrim, Usuario usuarioMovido) {
+        NotificadorStrategy notificador = notificadorFactory.crearEmailNotificador();
+        scrim.getPostulaciones().stream()
+                .filter(postulacion -> "SUPLENTE".equals(postulacion.getEstado().getNombre()))
+                .map(postulacion -> postulacion.getUsuario())
+                .forEach(usuario -> {
+                    Notificacion notificacion = new Notificacion(
+                            "CUPO_LIBERADO",
+                            notificador.getCanal(),
+                            "Se libero un cupo en el scrim " + scrim.getId()
+                                    + " porque " + usuarioMovido.getUsername() + " paso a suplente."
+                    );
+                    notificationDispatcher.enqueue(usuario, notificacion, notificador);
+                });
     }
 
     private void ejecutar(ScrimContext scrim, ScrimCommand command) {
@@ -215,6 +255,14 @@ public class ScrimService {
 
     public int procesarScrimsProgramados(LocalDateTime ahora) {
         return schedulerService.procesarScrimsProgramados(ahora);
+    }
+
+    public String generarIcal(UUID scrimId) {
+        return reminderService.generarIcal(getScrim(scrimId));
+    }
+
+    public List<RecordatorioScrim> procesarRecordatorios(LocalDateTime ahora, int horasAntes) {
+        return reminderService.procesarRecordatorios(ahora, horasAntes);
     }
 
     public ScrimContext getScrim(UUID scrimId) {

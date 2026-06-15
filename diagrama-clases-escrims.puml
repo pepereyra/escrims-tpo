@@ -21,6 +21,8 @@ package facade {
         + cambiarRol(): void
         + intercambiarRoles(): void
         + moverASuplente(): void
+        + generarIcal(): String
+        + procesarRecordatorios(): List
         + configurarNotificacionesEmail(): void
         + configurarNotificacionesPush(): void
         + configurarNotificacionesDiscord(): void
@@ -42,6 +44,8 @@ package controller {
         + cambiarRol(): void
         + intercambiarRoles(): void
         + moverASuplente(): void
+        + generarIcal(): String
+        + procesarRecordatorios(): List
         + procesarScrimsProgramados(): int
         + registrarEstadisticas(): List
         + getScrim(): ScrimContext
@@ -51,9 +55,13 @@ package controller {
 package controller_api {
     class ApiConfig <<Configuration>>
     class OpenApiConfig <<Configuration>>
+    class AuthRestController <<RestController>>
     class UsuarioRestController <<RestController>>
     class ScrimRestController <<RestController>>
+    class BusquedaFavoritaRestController <<RestController>>
+    class ModeracionRestController <<RestController>>
     class UsuarioApiRepository <<Repository>>
+    class AuditRestController <<RestController>>
     class ApiDtos <<DTO>>
     class ApiExceptionHandler <<RestControllerAdvice>>
 }
@@ -65,13 +73,26 @@ package service {
         + findAll(): Collection
     }
 
+    interface BusquedaFavoritaRepository <<Repository>>
+    interface AlertaBusquedaRepository <<Repository>>
+    interface AuditLogRepository <<Repository>>
+    interface FeedbackRepository <<Repository>>
+    interface ReporteConductaRepository <<Repository>>
+
     class InMemoryScrimRepository <<Repository>>
+    class BusquedaFavoritaService <<Observer>>
+    class AuditService <<Observer>>
+    class AuthService <<Service>>
+    class ModeracionService <<Service>>
+    class ScrimReminderService <<Service>>
+    class ScrimReminderScheduler <<Scheduled>>
 
     class ScrimService <<Service>> {
         - scrimRepository: ScrimRepository
         - eventBus: DomainEventBus
         - notificadorFactory: NotificadorFactory
         - schedulerService: ScrimSchedulerService
+        - reminderService: ScrimReminderService
         + crearScrim(): ScrimContext
         + postular(): void
         + confirmar(): void
@@ -81,6 +102,8 @@ package service {
         + cambiarRol(): void
         + intercambiarRoles(): void
         + moverASuplente(): void
+        + generarIcal(): String
+        + procesarRecordatorios(): List
         + registrarEstadisticas(): List
         + getScrim(): ScrimContext
     }
@@ -94,9 +117,24 @@ package infra_persistence {
     class PostulacionJpaEntity <<JPAEntity>>
     class ConfirmacionJpaEntity <<JPAEntity>>
     class EstadisticaJpaEntity <<JPAEntity>>
+    class FeedbackJpaEntity <<JPAEntity>>
+    class ReporteConductaJpaEntity <<JPAEntity>>
     interface SpringDataUsuarioJpaRepository <<Repository>>
     interface SpringDataScrimJpaRepository <<Repository>>
+    interface SpringDataFeedbackJpaRepository <<Repository>>
+    interface SpringDataReporteConductaJpaRepository <<Repository>>
+    interface SpringDataBusquedaFavoritaJpaRepository <<Repository>>
+    interface SpringDataAlertaBusquedaJpaRepository <<Repository>>
+    interface SpringDataAuditLogJpaRepository <<Repository>>
     class JpaScrimRepositoryAdapter <<RepositoryAdapter>>
+    class JpaFeedbackRepositoryAdapter <<RepositoryAdapter>>
+    class JpaReporteConductaRepositoryAdapter <<RepositoryAdapter>>
+    class JpaBusquedaFavoritaRepositoryAdapter <<RepositoryAdapter>>
+    class JpaAlertaBusquedaRepositoryAdapter <<RepositoryAdapter>>
+    class JpaAuditLogRepositoryAdapter <<RepositoryAdapter>>
+    class BusquedaFavoritaJpaEntity <<JPAEntity>>
+    class AlertaBusquedaJpaEntity <<JPAEntity>>
+    class AuditLogJpaEntity <<JPAEntity>>
 }
 
 package domain_model {
@@ -116,6 +154,14 @@ package domain_model {
     class Equipo
     class Confirmacion
     class Estadistica
+    class Feedback
+    class ReporteConducta {
+        - etapaResolucion: String
+    }
+    class BusquedaFavorita
+    class AlertaBusqueda
+    class AuditLog
+    class RecordatorioScrim
 
     class Postulacion {
         - usuario: Usuario
@@ -139,6 +185,10 @@ package domain_model {
     class PendienteNotificacion
     class EnviadaNotificacion
     class FallidaNotificacion
+    interface EstadoModeracion <<interface>>
+    class PendienteModeracion
+    class AprobadoModeracion
+    class RechazadoModeracion
 }
 
 package domain_state {
@@ -156,6 +206,7 @@ package domain_state {
         - postulaciones: List
         - confirmaciones: List
         - estadisticas: List
+        - modalidad: String
         - eventBus: DomainEventBus
         - matchmakingStrategy: MatchmakingStrategy
         + postular(): void
@@ -190,6 +241,20 @@ package domain_command {
     class MoverASuplenteCommand <<ConcreteCommand>>
 }
 
+package domain_moderation {
+    interface ReporteModeracionHandler <<Handler>> {
+        + resolver(): ReporteResolution
+    }
+
+    class AbstractReporteModeracionHandler <<ChainBase>> {
+        + linkWith(): AbstractReporteModeracionHandler
+    }
+    class AutoResolveReporteHandler <<ConcreteHandler>>
+    class BotModerationReporteHandler <<ConcreteHandler>>
+    class HumanModerationReporteHandler <<ConcreteHandler>>
+    class ReporteResolution
+}
+
 package domain_matchmaking {
     interface MatchmakingStrategy <<Strategy>>
     class ByMMRStrategy <<ConcreteStrategy>>
@@ -215,9 +280,18 @@ package infra_notification {
     class SendGridEmailAdapter <<Adapter>>
     class FirebasePushAdapter <<Adapter>>
     class DiscordWebhookAdapter <<Adapter>>
+    class QueuedNotificationDispatcher <<QueueRetry>>
     interface NotificadorFactory <<AbstractFactory>>
     class DevNotificadorFactory <<ConcreteFactory>>
     class ProdNotificadorFactory <<ConcreteFactory>>
+}
+
+package infra_calendar {
+    interface CalendarAdapter <<Adapter>> {
+        + generarEvento(scrim: ScrimContext): String
+    }
+
+    class ICalCalendarAdapter <<ConcreteAdapter>>
 }
 
 ApiApplication ..> UsuarioRestController
@@ -226,11 +300,22 @@ ApiConfig ..> ScrimFacade
 ApiConfig ..> ScrimController
 ApiConfig ..> ScrimService
 OpenApiConfig ..> ApiDtos
+AuthRestController --> AuthService
+AuthRestController ..> ApiDtos
 UsuarioRestController --> UsuarioApiRepository
 UsuarioRestController ..> ApiDtos
 ScrimRestController --> ScrimFacade
 ScrimRestController --> UsuarioApiRepository
 ScrimRestController ..> ApiDtos
+BusquedaFavoritaRestController --> BusquedaFavoritaService
+BusquedaFavoritaRestController --> AuthService
+BusquedaFavoritaRestController ..> ApiDtos
+ModeracionRestController --> ModeracionService
+ModeracionRestController --> AuthService
+ModeracionRestController ..> ApiDtos
+AuditRestController --> AuditService
+AuditRestController --> AuthService
+AuditRestController ..> ApiDtos
 ApiExceptionHandler ..> ApiDtos
 
 ScrimFacade --> ScrimController
@@ -241,8 +326,29 @@ ScrimService --> NotificadorFactory
 ScrimService --> DomainEventBus
 ScrimService --> ScrimRepository
 ScrimService *-- ScrimSchedulerService
+ScrimService *-- ScrimReminderService
+ScrimService --> QueuedNotificationDispatcher
 ScrimRepository <|.. InMemoryScrimRepository
 ScrimRepository <|.. JpaScrimRepositoryAdapter
+FeedbackRepository <|.. JpaFeedbackRepositoryAdapter
+ReporteConductaRepository <|.. JpaReporteConductaRepositoryAdapter
+BusquedaFavoritaRepository <|.. JpaBusquedaFavoritaRepositoryAdapter
+AlertaBusquedaRepository <|.. JpaAlertaBusquedaRepositoryAdapter
+AuditLogRepository <|.. JpaAuditLogRepositoryAdapter
+BusquedaFavoritaService --> BusquedaFavoritaRepository
+BusquedaFavoritaService --> AlertaBusquedaRepository
+BusquedaFavoritaService ..|> Subscriber
+AuditService --> AuditLogRepository
+AuditService ..|> Subscriber
+ModeracionService --> FeedbackRepository
+ModeracionService --> ReporteConductaRepository
+ModeracionService --> AuditService
+ModeracionService --> ReporteModeracionHandler
+ScrimReminderService --> CalendarAdapter
+ScrimReminderService --> NotificadorFactory
+ScrimReminderService --> QueuedNotificationDispatcher
+ScrimReminderService ..> RecordatorioScrim
+ScrimReminderScheduler --> ScrimService
 
 JpaScrimRepositoryAdapter --> SpringDataScrimJpaRepository
 JpaScrimRepositoryAdapter --> SpringDataUsuarioJpaRepository
@@ -250,18 +356,46 @@ JpaScrimRepositoryAdapter ..> ScrimJpaEntity
 JpaScrimRepositoryAdapter ..> PostulacionJpaEntity
 JpaScrimRepositoryAdapter ..> ConfirmacionJpaEntity
 JpaScrimRepositoryAdapter ..> EstadisticaJpaEntity
+JpaFeedbackRepositoryAdapter --> SpringDataFeedbackJpaRepository
+JpaFeedbackRepositoryAdapter --> SpringDataUsuarioJpaRepository
+JpaFeedbackRepositoryAdapter ..> FeedbackJpaEntity
+JpaReporteConductaRepositoryAdapter --> SpringDataReporteConductaJpaRepository
+JpaReporteConductaRepositoryAdapter --> SpringDataUsuarioJpaRepository
+JpaReporteConductaRepositoryAdapter ..> ReporteConductaJpaEntity
 UsuarioApiRepository --> SpringDataUsuarioJpaRepository
 SpringDataUsuarioJpaRepository ..> UsuarioJpaEntity
 SpringDataScrimJpaRepository ..> ScrimJpaEntity
+SpringDataFeedbackJpaRepository ..> FeedbackJpaEntity
+SpringDataReporteConductaJpaRepository ..> ReporteConductaJpaEntity
+JpaBusquedaFavoritaRepositoryAdapter --> SpringDataBusquedaFavoritaJpaRepository
+JpaAlertaBusquedaRepositoryAdapter --> SpringDataAlertaBusquedaJpaRepository
+JpaAuditLogRepositoryAdapter --> SpringDataAuditLogJpaRepository
+SpringDataBusquedaFavoritaJpaRepository ..> BusquedaFavoritaJpaEntity
+SpringDataAlertaBusquedaJpaRepository ..> AlertaBusquedaJpaEntity
+SpringDataAuditLogJpaRepository ..> AuditLogJpaEntity
 
 ScrimJpaEntity *-- PostulacionJpaEntity
 ScrimJpaEntity *-- ConfirmacionJpaEntity
 ScrimJpaEntity *-- EstadisticaJpaEntity
+ScrimJpaEntity *-- FeedbackJpaEntity
+ScrimJpaEntity *-- ReporteConductaJpaEntity
 PostulacionJpaEntity --> UsuarioJpaEntity
 ConfirmacionJpaEntity --> UsuarioJpaEntity
 EstadisticaJpaEntity --> UsuarioJpaEntity
+FeedbackJpaEntity --> UsuarioJpaEntity
+ReporteConductaJpaEntity --> UsuarioJpaEntity
 
 Usuario --> Rol
+BusquedaFavorita --> Usuario
+AlertaBusqueda --> Usuario
+Feedback --> Usuario
+ReporteConducta --> Usuario
+ReporteConducta --> EstadoModeracion
+EstadoModeracion <|.. PendienteModeracion
+EstadoModeracion <|.. AprobadoModeracion
+EstadoModeracion <|.. RechazadoModeracion
+RecordatorioScrim --> Usuario
+RecordatorioScrim --> ScrimContext
 Postulacion --> Usuario
 Postulacion --> Rol
 Postulacion --> EstadoPostulacion
@@ -301,6 +435,15 @@ IntercambiarRolesCommand --> Usuario
 MoverASuplenteCommand --> ScrimContext
 MoverASuplenteCommand --> Usuario
 
+ReporteModeracionHandler <|.. AbstractReporteModeracionHandler
+AbstractReporteModeracionHandler <|-- AutoResolveReporteHandler
+AbstractReporteModeracionHandler <|-- BotModerationReporteHandler
+ReporteModeracionHandler <|.. HumanModerationReporteHandler
+AutoResolveReporteHandler --> BotModerationReporteHandler
+BotModerationReporteHandler --> HumanModerationReporteHandler
+ReporteModeracionHandler ..> ReporteConducta
+ReporteModeracionHandler ..> ReporteResolution
+
 MatchmakingStrategy <|.. ByMMRStrategy
 MatchmakingStrategy <|.. ByLatencyStrategy
 MatchmakingStrategy <|.. ByHistoryStrategy
@@ -312,6 +455,7 @@ DomainEvent <|.. ScrimStateChangedEvent
 DomainEventBus o-- Subscriber
 Subscriber <|.. NotificationSubscriber
 NotificationSubscriber --> NotificadorStrategy
+NotificationSubscriber --> QueuedNotificationDispatcher
 NotificationSubscriber ..> Notificacion
 
 NotificadorStrategy <|.. EmailNotificador
@@ -326,5 +470,8 @@ NotificadorFactory ..> NotificadorStrategy
 ProdNotificadorFactory ..> SendGridEmailAdapter
 ProdNotificadorFactory ..> FirebasePushAdapter
 ProdNotificadorFactory ..> DiscordWebhookAdapter
+
+CalendarAdapter <|.. ICalCalendarAdapter
+ICalCalendarAdapter ..> ScrimContext
 
 @enduml
