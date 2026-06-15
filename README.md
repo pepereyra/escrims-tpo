@@ -31,6 +31,7 @@ Main / API REST -> Facade -> Controller -> Service -> Domain -> Infra
 | Builder | `escrims.domain.state.ScrimBuilder` | Construccion incremental de `ScrimContext` con validacion de invariantes. |
 | Command | `escrims.domain.command` | Encapsula acciones de gestion de roles y suplentes del scrim. |
 | Chain of Responsibility | `escrims.domain.moderation` | Procesa reportes con auto-resolver, bot y moderador humano. |
+| Strategy | `escrims.domain.rules` | Reglas intercambiables por juego para formatos, cupos y roles permitidos. |
 
 ## Regla Sin Enums
 
@@ -55,6 +56,8 @@ src/main/java/escrims/
 │       ├── ApiExceptionHandler.java
 │       ├── AuditRestController.java
 │       ├── BusquedaFavoritaRestController.java
+│       ├── CatalogoRestController.java
+│       ├── FrontendRestController.java
 │       ├── ModeracionRestController.java
 │       ├── OpenApiConfig.java
 │       ├── ScrimRestController.java
@@ -114,6 +117,14 @@ src/main/java/escrims/
 │   │   ├── AutoResolveReporteHandler.java
 │   │   ├── BotModerationReporteHandler.java
 │   │   └── HumanModerationReporteHandler.java
+│   ├── rules/
+│   │   ├── GameRulesStrategy.java
+│   │   ├── GameRulesValidator.java
+│   │   ├── ValorantGameRulesStrategy.java
+│   │   ├── LeagueOfLegendsGameRulesStrategy.java
+│   │   ├── Cs2GameRulesStrategy.java
+│   │   ├── GenericGameRulesStrategy.java
+│   │   └── GameRulesRegistry.java
 │   └── matchmaking/
 │       ├── MatchmakingStrategy.java
 │       ├── ByMMRStrategy.java
@@ -312,7 +323,13 @@ las busquedas guardadas y genera alertas persistidas. Las notificaciones usan un
 con reintentos exponenciales antes de marcar una notificacion como fallida. La auditoria registra
 cambios de estado y acciones de moderacion.
 
-El scrim modela modalidad (`RANKED_LIKE`, `CASUAL`, `PRACTICA`). Para calendario, se expone
+El scrim modela modalidad (`RANKED_LIKE`, `CASUAL`, `PRACTICA`). Las reglas variables por juego
+se concentran en estrategias de `escrims.domain.rules`: Valorant, LoL y CS2 declaran formatos
+y roles permitidos, y los juegos no registrados usan una estrategia generica para mantener el
+sistema multijuego extensible. `ScrimBuilder` valida creacion contra esas estrategias y
+`BuscandoState` valida roles al postular.
+
+Para calendario, se expone
 un adapter iCal y un scheduler Spring que procesa recordatorios N horas antes y envia
 notificaciones simuladas a los participantes confirmados. Tambien existe un endpoint manual
 para disparar el procesamiento durante la demo. La moderacion de reportes pasa por una cadena
@@ -326,14 +343,18 @@ sin intervencion manual y el resto queda pendiente con la etapa registrada.
 | GET | `/api/auth/me` | Consultar usuario autenticado con `Authorization: Bearer <token>`. |
 | POST | `/api/auth/me/verificar-email` | Pasar email de pendiente a verificado. |
 | PUT | `/api/auth/me/perfil` | Editar perfil: juego, rango, roles, region, latencia y disponibilidad. |
+| GET | `/api/dashboard/me` | Resumen autenticado para frontend: perfil, mis scrims, alertas y proximos scrims. |
 | POST | `/api/busquedas-favoritas` | Guardar una busqueda favorita del usuario autenticado. |
 | GET | `/api/busquedas-favoritas` | Listar busquedas favoritas del usuario autenticado. |
 | GET | `/api/alertas` | Listar alertas generadas por scrims compatibles con las busquedas favoritas. |
+| GET | `/api/catalogos` | Consultar juegos soportados, formatos, roles y modalidades para frontend. |
 | POST | `/api/usuarios` | Crear usuario de prueba con juego, rango, latencia y verificacion. |
 | GET | `/api/usuarios` | Listar usuarios persistidos. |
 | POST | `/api/scrims` | Crear scrim. |
 | GET | `/api/scrims?juego=&formato=&region=&rangoMin=&rangoMax=&fecha=&latenciaMax=` | Buscar scrims por filtros. |
+| GET | `/api/scrims/mis-scrims` | Listar scrims donde participa el usuario autenticado, con rol y confirmacion. |
 | GET | `/api/scrims/{scrimId}` | Consultar estado del scrim. |
+| GET | `/api/scrims/{scrimId}/participantes` | Obtener lobby agrupado por aceptados, suplentes, pendientes y rechazados. |
 | POST | `/api/scrims/{scrimId}/postulaciones` | Postular usuario con rol. |
 | POST | `/api/scrims/{scrimId}/confirmaciones` | Confirmar asistencia. |
 | GET | `/api/scrims/{scrimId}/ical` | Descargar/generar el contenido iCal del scrim. |
@@ -397,4 +418,4 @@ mvn test
 mvn exec:java
 ```
 
-Resultado actual de tests: 70 ejecutados, 0 fallas, 0 errores.
+Resultado actual de tests: 77 ejecutados, 0 fallas, 0 errores.

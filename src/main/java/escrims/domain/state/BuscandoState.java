@@ -4,6 +4,7 @@ import escrims.domain.model.Confirmacion;
 import escrims.domain.model.Postulacion;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
+import escrims.domain.rules.GameRulesRegistry;
 import escrims.infra.events.ScrimStateChangedEvent;
 
 /**
@@ -22,6 +23,8 @@ import escrims.infra.events.ScrimStateChangedEvent;
  * no depende de estrategias concretas de matchmaking.
  */
 public class BuscandoState implements ScrimState {
+
+    private final GameRulesRegistry gameRulesRegistry = new GameRulesRegistry();
 
     @Override
     public void postular(ScrimContext ctx, Usuario u, Rol rol) {
@@ -49,6 +52,8 @@ public class BuscandoState implements ScrimState {
                             + " no cumple con las reglas de matchmaking configuradas."
             );
         }
+
+        gameRulesRegistry.obtenerPara(ctx.getJuego()).validarPostulacion(ctx, rol);
 
         Postulacion postulacion = new Postulacion(u, rol);
         postulacion.aceptar();

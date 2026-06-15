@@ -59,6 +59,8 @@ package controller_api {
     class UsuarioRestController <<RestController>>
     class ScrimRestController <<RestController>>
     class BusquedaFavoritaRestController <<RestController>>
+    class CatalogoRestController <<RestController>>
+    class FrontendRestController <<RestController>>
     class ModeracionRestController <<RestController>>
     class UsuarioApiRepository <<Repository>>
     class AuditRestController <<RestController>>
@@ -263,6 +265,20 @@ package domain_matchmaking {
     class CompositeMatchmakingStrategy <<CompositeStrategy>>
 }
 
+package domain_rules {
+    interface GameRulesStrategy <<Strategy>> {
+        + validarCreacion(): void
+        + validarPostulacion(): void
+    }
+
+    class ValorantGameRulesStrategy <<ConcreteStrategy>>
+    class LeagueOfLegendsGameRulesStrategy <<ConcreteStrategy>>
+    class Cs2GameRulesStrategy <<ConcreteStrategy>>
+    class GenericGameRulesStrategy <<ConcreteStrategy>>
+    class GameRulesValidator <<Utility>>
+    class GameRulesRegistry <<Registry>>
+}
+
 package infra_events {
     interface DomainEvent <<Event>>
     class ScrimCreadoEvent
@@ -302,6 +318,12 @@ ApiConfig ..> ScrimService
 OpenApiConfig ..> ApiDtos
 AuthRestController --> AuthService
 AuthRestController ..> ApiDtos
+CatalogoRestController --> GameRulesRegistry
+CatalogoRestController ..> ApiDtos
+FrontendRestController --> ScrimFacade
+FrontendRestController --> AuthService
+FrontendRestController --> BusquedaFavoritaService
+FrontendRestController ..> ApiDtos
 UsuarioRestController --> UsuarioApiRepository
 UsuarioRestController ..> ApiDtos
 ScrimRestController --> ScrimFacade
@@ -416,6 +438,8 @@ ScrimContext --> DomainEventBus
 ScrimContext --> MatchmakingStrategy
 ScrimBuilder ..> ScrimContext
 ScrimBuilder --> MatchmakingStrategy
+ScrimBuilder --> GameRulesRegistry
+BuscandoState --> GameRulesRegistry
 
 ScrimState <|.. BuscandoState
 ScrimState <|.. LobbyArmadoState
@@ -449,6 +473,18 @@ MatchmakingStrategy <|.. ByLatencyStrategy
 MatchmakingStrategy <|.. ByHistoryStrategy
 MatchmakingStrategy <|.. CompositeMatchmakingStrategy
 CompositeMatchmakingStrategy o-- MatchmakingStrategy
+
+GameRulesStrategy <|.. ValorantGameRulesStrategy
+GameRulesStrategy <|.. LeagueOfLegendsGameRulesStrategy
+GameRulesStrategy <|.. Cs2GameRulesStrategy
+GameRulesStrategy <|.. GenericGameRulesStrategy
+GameRulesRegistry o-- GameRulesStrategy
+GameRulesStrategy ..> ScrimContext
+GameRulesStrategy ..> Rol
+ValorantGameRulesStrategy ..> GameRulesValidator
+LeagueOfLegendsGameRulesStrategy ..> GameRulesValidator
+Cs2GameRulesStrategy ..> GameRulesValidator
+GenericGameRulesStrategy ..> GameRulesValidator
 
 DomainEvent <|.. ScrimCreadoEvent
 DomainEvent <|.. ScrimStateChangedEvent
