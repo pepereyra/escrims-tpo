@@ -1,5 +1,4 @@
-@startuml eScrims - Diagrama de Estados del Scrim
-
+@startuml
 skinparam stateFontSize 13
 skinparam stateBackgroundColor #DDEEFF
 skinparam stateBorderColor #336699
@@ -7,13 +6,13 @@ skinparam arrowColor #336699
 skinparam noteBackgroundColor #FFFACD
 skinparam noteBorderColor #DAA520
 
-title Diagrama de Estados — Ciclo de Vida del Scrim (eScrims)
+title Diagrama de Estados - Ciclo de Vida del Scrim
 
-[*] --> BuscandoJugadores : <<create>>\nScrimBuilder.build()
+[*] --> BuscandoJugadores : ScrimBuilder.build()
 
 state BuscandoJugadores {
     [*] --> Esperando
-    Esperando --> Esperando : postular(usuario, rol)\n[rango y latencia válidos]
+    Esperando --> Esperando : postular(usuario, rol)\n[matchmaking compatible]
 }
 
 state LobbyArmado {
@@ -37,80 +36,64 @@ state Cancelado {
     [*] --> Terminado
 }
 
-BuscandoJugadores --> LobbyArmado : cuposTotales completos\n[todosLosCuposLlenos()]\n/ publicar ScrimStateChangedEvent(LOBBY_ARMADO)
+BuscandoJugadores --> LobbyArmado : cupos completos\n/ publicar LOBBY_ARMADO
+BuscandoJugadores --> Cancelado : cancelar()\n/ publicar CANCELADO
+LobbyArmado --> Confirmado : todosConfirmaron()\n/ publicar CONFIRMADO
+LobbyArmado --> Cancelado : cancelar()\n/ publicar CANCELADO
+Confirmado --> EnJuego : procesarScrimsProgramados()\n[fechaHora <= ahora]\n/ publicar EN_JUEGO
+Confirmado --> Cancelado : cancelar()\n/ publicar CANCELADO
+EnJuego --> Finalizado : finalizar()\n/ publicar FINALIZADO
 
-BuscandoJugadores --> Cancelado : cancelar()\n[organizador cancela]\n/ publicar ScrimStateChangedEvent(CANCELADO)
-
-LobbyArmado --> Confirmado : todosConfirmaron()\n[confirmaciones == cuposTotales]\n/ publicar ScrimStateChangedEvent(CONFIRMADO)
-
-LobbyArmado --> Cancelado : cancelar()\n[organizador cancela]\n/ publicar ScrimStateChangedEvent(CANCELADO)
-
-Confirmado --> EnJuego : iniciar()\n[llamada manual del organizador]\n/ publicar ScrimStateChangedEvent(EN_JUEGO)
-
-Confirmado --> Cancelado : cancelar()\n[organizador cancela]\n/ publicar ScrimStateChangedEvent(CANCELADO)
-
-EnJuego --> Finalizado : finalizar()\n[cierre manual o cron]\n/ publicar ScrimStateChangedEvent(FINALIZADO)
-
-Finalizado --> [*] : <<destroy>>
-Cancelado --> [*] : <<destroy>>
+Finalizado --> [*]
+Cancelado --> [*]
 
 note right of BuscandoJugadores
-  **Acciones permitidas:**
+  Acciones permitidas:
   - postular(usuario, rol)
   - cancelar()
-  
-  **Validaciones:**
-  - Rango del usuario dentro de [rangoMin, rangoMax]
-  - Latencia del usuario <= latenciaMax
-  - Usuario verificado y sin cooldown activo
+
+  Validaciones:
+  - Usuario verificado
+  - Usuario no postulado previamente
+  - Matchmaking compatible
   - Cupos disponibles > 0
 end note
 
 note right of LobbyArmado
-  **Acciones permitidas:**
+  Acciones permitidas:
   - confirmar(usuario)
   - cancelar()
-  
-  **Regla de negocio:**
-  - Todos los jugadores deben confirmar
-  - El scrim permanece en este estado
-    hasta que todos confirmen o se cancele
+
+  Regla:
+  todos los jugadores deben confirmar.
 end note
 
 note right of Confirmado
-  **Acciones permitidas:**
-  - iniciar() [organizador llama manualmente]
-  - cancelar() [solo organizador]
-  
-  **Regla de negocio:**
-  - El organizador inicia el scrim
-    cuando todos están listos
-  - No hay transición automática por fechaHora
-    en esta versión del sistema
+  Acciones permitidas:
+  - iniciar()
+  - procesarScrimsProgramados()
+  - cancelar()
+
+  ScrimSchedulerService inicia
+  cuando fechaHora <= ahora.
 end note
 
 note right of EnJuego
-  **Acciones permitidas:**
-  - finalizar() [manual o cron]
-  
-  **Regla de negocio:**
-  - No se puede cancelar una vez iniciado
-  - Se registran abandonos (strikes)
+  Acciones permitidas:
+  - finalizar()
+
+  No se puede cancelar una vez iniciado.
 end note
 
 note right of Finalizado
-  **Acciones habilitadas:**
-  - Cargar estadísticas (kills, deaths, assists, MVP)
-  - Dar feedback y rating a jugadores
-  - Reportar conducta
+  Acciones habilitadas:
+  - cargar estadisticas
+  - calcular MVP
 end note
 
 note bottom of Cancelado
-  **Regla de negocio:**
-  - Solo el organizador puede cancelar
-  - Aplica antes de EnJuego
-  - Se notifica a todos los participantes
-  - Se registra el motivo de cancelación
+  Estado terminal.
+  Se notifica a los participantes.
 end note
 
 @enduml

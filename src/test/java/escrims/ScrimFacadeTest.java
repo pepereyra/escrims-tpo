@@ -1,11 +1,10 @@
 package escrims;
 
-import escrims.dominio.Estadistica;
-import escrims.dominio.Usuario;
-import escrims.dominio.enums.CanalNotificacion;
-import escrims.dominio.enums.Rol;
+import escrims.domain.model.Estadistica;
+import escrims.domain.model.Rol;
+import escrims.domain.model.Usuario;
 import escrims.facade.ScrimFacade;
-import escrims.state.ScrimContext;
+import escrims.domain.state.ScrimContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,8 +56,8 @@ class ScrimFacadeTest {
         ScrimContext scrim = crearScrim2v2();
 
         // Configurar notificaciones — el cliente no sabe que usa Observer + Strategy + Factory
-        facade.configurarNotificaciones(List.of(alpha, bravo), CanalNotificacion.EMAIL);
-        facade.configurarNotificaciones(List.of(charlie, delta), CanalNotificacion.PUSH);
+        facade.configurarNotificacionesEmail(List.of(alpha, bravo));
+        facade.configurarNotificacionesPush(List.of(charlie, delta));
 
         // Postular — el cliente no sabe que usa State (BuscandoState)
         facade.postular(scrim.getId(), alpha, Rol.DUELIST);

@@ -1,11 +1,10 @@
 package escrims;
 
-import escrims.dominio.Estadistica;
-import escrims.dominio.Usuario;
-import escrims.dominio.enums.CanalNotificacion;
-import escrims.dominio.enums.Rol;
+import escrims.domain.model.Estadistica;
+import escrims.domain.model.Rol;
+import escrims.domain.model.Usuario;
 import escrims.facade.ScrimFacade;
-import escrims.state.ScrimContext;
+import escrims.domain.state.ScrimContext;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -59,8 +58,8 @@ public class Main {
         System.out.println("\n--- CONFIGURANDO NOTIFICACIONES ---");
         // PATRON FACADE: el cliente no sabe que internamente se usa NotificadorFactory
         // ni que se suscribe un NotificationSubscriber al DomainEventBus.
-        facade.configurarNotificaciones(List.of(alpha, bravo), CanalNotificacion.EMAIL);
-        facade.configurarNotificaciones(List.of(charlie, delta), CanalNotificacion.PUSH);
+        facade.configurarNotificacionesEmail(List.of(alpha, bravo));
+        facade.configurarNotificacionesPush(List.of(charlie, delta));
 
         // ── 5. Postulaciones (BUSCANDO → LOBBY_ARMADO automático) ───
         System.out.println("\n--- POSTULACIONES ---");
@@ -82,9 +81,9 @@ public class Main {
 
         System.out.println("\nEstado actual: " + scrim.getState().getNombre());
 
-        // ── 7. Iniciar (CONFIRMADO → EN_JUEGO) ──────────────────────
-        System.out.println("\n--- INICIANDO SCRIM ---");
-        facade.iniciar(scrim.getId());
+        // ── 7. Scheduler (CONFIRMADO → EN_JUEGO por fechaHora) ─────
+        System.out.println("\n--- PROCESANDO SCHEDULER ---");
+        facade.procesarScrimsProgramados(scrim.getFechaHora().plusSeconds(1));
         System.out.println("Estado actual: " + scrim.getState().getNombre());
 
         // ── 8. Finalizar (EN_JUEGO → FINALIZADO) ────────────────────
