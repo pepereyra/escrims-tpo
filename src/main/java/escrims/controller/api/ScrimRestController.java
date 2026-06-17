@@ -1,6 +1,8 @@
 package escrims.controller.api;
 
 import escrims.domain.model.Estadistica;
+import escrims.domain.model.Equipo;
+import escrims.domain.model.Postulacion;
 import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
@@ -162,6 +164,12 @@ public class ScrimRestController {
         return toResponse(facade.getScrim(scrimId));
     }
 
+    @PostMapping("/scrims/{scrimId}/comandos/undo")
+    public ApiDtos.ScrimResponse deshacerUltimoComando(@PathVariable("scrimId") UUID scrimId) {
+        facade.deshacerUltimoComando(scrimId);
+        return toResponse(facade.getScrim(scrimId));
+    }
+
     @PostMapping("/scrims/{scrimId}/estadisticas")
     public List<ApiDtos.EstadisticaResponse> registrarEstadisticas(
             @PathVariable("scrimId") UUID scrimId,
@@ -220,6 +228,9 @@ public class ScrimRestController {
                 scrim.getModalidad(),
                 scrim.cuposDisponibles(),
                 scrim.getFechaHora(),
+                scrim.getEquipos().stream()
+                        .map(equipo -> toEquipoResponse(scrim, equipo))
+                        .toList(),
                 scrim.getPostulaciones().stream()
                         .map(postulacion -> new ApiDtos.PostulacionResponse(
                                 postulacion.getUsuario().getUsername(),
@@ -227,6 +238,34 @@ public class ScrimRestController {
                                 postulacion.getEstado().getNombre()
                         ))
                         .toList()
+        );
+    }
+
+    private ApiDtos.EquipoResponse toEquipoResponse(ScrimContext scrim, Equipo equipo) {
+        return new ApiDtos.EquipoResponse(
+                equipo.getLado(),
+                equipo.getJugadores().stream()
+                        .map(usuario -> toParticipanteResponse(scrim, usuario))
+                        .toList()
+        );
+    }
+
+    private ApiDtos.ParticipanteScrimResponse toParticipanteResponse(ScrimContext scrim, Usuario usuario) {
+        Postulacion postulacion = scrim.getPostulaciones().stream()
+                .filter(p -> p.getUsuario().getId().equals(usuario.getId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "El usuario " + usuario.getUsername() + " no tiene postulacion en el scrim."
+                ));
+        var confirmacion = scrim.getConfirmacionDeUsuario(usuario);
+        return new ApiDtos.ParticipanteScrimResponse(
+                usuario.getUsername(),
+                postulacion.getRolDeseado().getNombre(),
+                postulacion.getEstado().getNombre(),
+                confirmacion != null && confirmacion.isConfirmado(),
+                confirmacion == null ? null : confirmacion.getFechaConfirmacion(),
+                usuario.getRangoEnJuego(scrim.getJuego()),
+                usuario.getLatenciaPromedio()
         );
     }
 

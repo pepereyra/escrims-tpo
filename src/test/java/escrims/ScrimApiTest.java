@@ -57,10 +57,89 @@ class ScrimApiTest {
                 .andExpect(jsonPath("$.info.title").value("eScrims API"))
                 .andExpect(jsonPath("$.paths./api/auth/register").exists())
                 .andExpect(jsonPath("$.paths./api/usuarios").exists())
-                .andExpect(jsonPath("$.paths./api/scrims").exists());
+                .andExpect(jsonPath("$.paths./api/scrims").exists())
+                .andExpect(jsonPath("$.paths./api/catalogos").exists());
 
         mvc.perform(get("/swagger-ui.html"))
                 .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
+    @DisplayName("API REST expone catalogos de reglas por juego para frontend")
+    void apiRestExponeCatalogosDeReglasPorJuego() throws Exception {
+        mvc.perform(get("/api/catalogos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modalidades").value(hasItem("CASUAL")))
+                .andExpect(jsonPath("$.juegos[?(@.juego == 'Valorant')].formatosPermitidos[0]").exists())
+                .andExpect(jsonPath("$.juegos[?(@.juego == 'LoL')].rolesPermitidos[0]").exists());
+    }
+
+    @Test
+    @DisplayName("API REST valida reglas variables por juego al crear scrims")
+    void apiRestValidaReglasVariablesPorJuego() throws Exception {
+        mvc.perform(post("/api/scrims")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.CrearScrimRequest(
+                                "LoL",
+                                "3v3",
+                                "SA",
+                                1400,
+                                1700,
+                                80,
+                                LocalDateTime.now().plusHours(2).withNano(0),
+                                30,
+                                6
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("no esta permitido")));
+    }
+
+    @Test
+    @DisplayName("API REST expone endpoints agregados para frontend autenticado")
+    void apiRestExponeEndpointsParaFrontendAutenticado() throws Exception {
+        LocalDateTime fechaHora = LocalDateTime.now().plusHours(2).withNano(0);
+
+        String token = registrarUsuarioAuth("FrontAlpha", "front-alpha@mail.com");
+        verificarEmail(token);
+        crearUsuario("FrontBravo", "front-bravo@mail.com", 1600, 25);
+        crearUsuario("FrontCharlie", "front-charlie@mail.com", 1450, 40);
+        crearUsuario("FrontDelta", "front-delta@mail.com", 1550, 35);
+
+        UUID scrimId = crearScrim(fechaHora);
+
+        postular(scrimId, "FrontAlpha", "DUELIST", "BUSCANDO");
+        postular(scrimId, "FrontBravo", "SUPPORT", "BUSCANDO");
+        postular(scrimId, "FrontCharlie", "DUELIST", "BUSCANDO");
+        postular(scrimId, "FrontDelta", "SUPPORT", "LOBBY_ARMADO");
+
+        mvc.perform(get("/api/dashboard/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usuario.username").value("FrontAlpha"))
+                .andExpect(jsonPath("$.misScrimsTotal").value(1))
+                .andExpect(jsonPath("$.scrimsPorConfirmar").value(1))
+                .andExpect(jsonPath("$.proximosScrims[0].id").value(scrimId.toString()))
+                .andExpect(jsonPath("$.proximosScrims[0].puedeConfirmar").value(true));
+
+        mvc.perform(get("/api/scrims/mis-scrims")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scrims", hasSize(1)))
+                .andExpect(jsonPath("$.scrims[0].miRol").value("DUELIST"))
+                .andExpect(jsonPath("$.scrims[0].miEstadoPostulacion").value("ACEPTADA"));
+
+        mvc.perform(get("/api/scrims/{scrimId}/participantes", scrimId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scrimId").value(scrimId.toString()))
+                .andExpect(jsonPath("$.equipos", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].lado").value("A"))
+                .andExpect(jsonPath("$.equipos[0].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[1].lado").value("B"))
+                .andExpect(jsonPath("$.equipos[1].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.aceptados", hasSize(4)))
+                .andExpect(jsonPath("$.aceptados[?(@.username == 'FrontAlpha')].rol").value(hasItem("DUELIST")))
+                .andExpect(jsonPath("$.aceptados[?(@.username == 'FrontAlpha')].confirmado").value(hasItem(false)));
     }
 
     @Test
@@ -188,12 +267,24 @@ class ScrimApiTest {
         postular(scrimId, "ApiCharlie", "DUELIST", "BUSCANDO");
         postular(scrimId, "ApiDelta", "SUPPORT", "LOBBY_ARMADO");
 
+        mvc.perform(get("/api/scrims/{scrimId}", scrimId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.equipos", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[1].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].jugadores[?(@.username == 'ApiAlpha')].rol").value(hasItem("DUELIST")));
+
         mvc.perform(post("/api/scrims/{scrimId}/roles/intercambiar", scrimId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(new ApiDtos.IntercambiarRolesRequest("ApiAlpha", "ApiBravo"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiAlpha')].rol").value(hasItem("SUPPORT")))
                 .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiBravo')].rol").value(hasItem("DUELIST")));
+
+        mvc.perform(post("/api/scrims/{scrimId}/comandos/undo", scrimId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiAlpha')].rol").value(hasItem("DUELIST")))
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiBravo')].rol").value(hasItem("SUPPORT")));
 
         confirmar(scrimId, "ApiAlpha", "LOBBY_ARMADO");
         confirmar(scrimId, "ApiBravo", "LOBBY_ARMADO");
@@ -630,6 +721,13 @@ class ScrimApiTest {
                 .getContentAsString();
 
         return read(response).get("token").asText();
+    }
+
+    private void verificarEmail(String token) throws Exception {
+        mvc.perform(post("/api/auth/me/verificar-email")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verificado").value(true));
     }
 
     private String registrarModerador(String username, String email) throws Exception {

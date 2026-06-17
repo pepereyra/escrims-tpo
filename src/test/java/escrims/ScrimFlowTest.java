@@ -107,6 +107,22 @@ class ScrimFlowTest {
     }
 
     @Test
+    @DisplayName("Reglas por juego: LoL rechaza roles que no pertenecen al juego")
+    void lolRechazaRolDeValorant() {
+        ScrimContext scrim = controller.crearScrim(
+                "LoL", "1v1", "SA",
+                1400, 1700, 80,
+                LocalDateTime.now().plusHours(2), 30, 2
+        );
+        Usuario lolPlayer = crearUsuario("LolPlayer", "lol@mail.com", "LoL", 1500, 30);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> controller.postular(scrim.getId(), lolPlayer, Rol.DUELIST));
+
+        assertTrue(error.getMessage().contains("no esta permitido"));
+    }
+
+    @Test
     @DisplayName("No se puede postular en estado LOBBY_ARMADO")
     void noSePuedePostularEnLobbyArmado() {
         ScrimContext scrim = crearScrim2v2();

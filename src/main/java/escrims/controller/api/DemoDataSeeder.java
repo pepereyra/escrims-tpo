@@ -108,14 +108,14 @@ public class DemoDataSeeder implements CommandLineRunner {
 
         scrimService.crearScrim(
                 "LoL",
-                "3v3",
+                "2v2",
                 "BR",
                 1500,
                 1800,
                 90,
                 LocalDateTime.now().plusDays(1).withNano(0),
                 45,
-                6,
+                4,
                 "CASUAL"
         );
     }

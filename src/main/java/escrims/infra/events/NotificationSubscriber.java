@@ -2,6 +2,7 @@ package escrims.infra.events;
 
 import escrims.domain.model.Notificacion;
 import escrims.domain.model.Usuario;
+import escrims.infra.notification.NotificationDispatcher;
 import escrims.infra.notification.NotificadorStrategy;
 import escrims.infra.notification.QueuedNotificationDispatcher;
 
@@ -19,7 +20,7 @@ public class NotificationSubscriber implements Subscriber {
 
     private final List<Usuario> destinatarios;
     private final NotificadorStrategy notificador;
-    private final QueuedNotificationDispatcher dispatcher;
+    private final NotificationDispatcher dispatcher;
 
     public NotificationSubscriber(List<Usuario> destinatarios,
                                    NotificadorStrategy notificador) {
@@ -28,7 +29,7 @@ public class NotificationSubscriber implements Subscriber {
 
     public NotificationSubscriber(List<Usuario> destinatarios,
                                    NotificadorStrategy notificador,
-                                   QueuedNotificationDispatcher dispatcher) {
+                                   NotificationDispatcher dispatcher) {
         this.destinatarios = destinatarios;
         this.notificador = notificador;
         this.dispatcher = dispatcher;

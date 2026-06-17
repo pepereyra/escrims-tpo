@@ -26,11 +26,13 @@ Main / API REST -> Facade -> Controller -> Service -> Domain -> Infra
 | Observer | `escrims.infra.events` | Publicacion de eventos de dominio y suscriptores desacoplados para notificaciones, alertas y auditoria. |
 | Abstract Factory | `escrims.infra.notification` | Familias DEV/PROD de notificadores. |
 | Adapter | `escrims.infra.notification` | Adapta integraciones externas simuladas a `NotificadorStrategy`. |
+| Adapter | `escrims.infra.notification` | Adapta la publicacion RabbitMQ a la interfaz interna `NotificationMessagePublisher`. |
 | Adapter | `escrims.infra.calendar` | Genera invitaciones iCal desde el modelo interno de scrims. |
 | Repository | `escrims.service` / `escrims.infra.persistence` | Desacopla el dominio de la persistencia JPA sobre H2 o MySQL. |
 | Builder | `escrims.domain.state.ScrimBuilder` | Construccion incremental de `ScrimContext` con validacion de invariantes. |
-| Command | `escrims.domain.command` | Encapsula acciones de gestion de roles y suplentes del scrim. |
+| Command | `escrims.domain.command` | Encapsula acciones de gestion de roles y suplentes del scrim, incluyendo undo. |
 | Chain of Responsibility | `escrims.domain.moderation` | Procesa reportes con auto-resolver, bot y moderador humano. |
+| Template Method | `escrims.domain.rules` | Define el flujo comun de validacion y delega reglas especificas por juego. |
 
 ## Regla Sin Enums
 
@@ -55,6 +57,8 @@ src/main/java/escrims/
 │       ├── ApiExceptionHandler.java
 │       ├── AuditRestController.java
 │       ├── BusquedaFavoritaRestController.java
+│       ├── CatalogoRestController.java
+│       ├── FrontendRestController.java
 │       ├── ModeracionRestController.java
 │       ├── OpenApiConfig.java
 │       ├── ScrimRestController.java
@@ -114,6 +118,14 @@ src/main/java/escrims/
 │   │   ├── AutoResolveReporteHandler.java
 │   │   ├── BotModerationReporteHandler.java
 │   │   └── HumanModerationReporteHandler.java
+│   ├── rules/
+│   │   ├── GameRulesTemplate.java
+│   │   ├── GameRulesValidator.java
+│   │   ├── ValorantGameRulesTemplate.java
+│   │   ├── LeagueOfLegendsGameRulesTemplate.java
+│   │   ├── Cs2GameRulesTemplate.java
+│   │   ├── GenericGameRulesTemplate.java
+│   │   └── GameRulesRegistry.java
 │   └── matchmaking/
 │       ├── MatchmakingStrategy.java
 │       ├── ByMMRStrategy.java
@@ -136,7 +148,15 @@ src/main/java/escrims/
         ├── EmailNotificador.java
         ├── PushNotificador.java
         ├── DiscordNotificador.java
+        ├── NotificationDispatcher.java
         ├── QueuedNotificationDispatcher.java
+        ├── NotificationQueueMessage.java
+        ├── NotificationQueueNames.java
+        ├── NotificationMessagePublisher.java
+        ├── RabbitNotificationDispatcher.java
+        ├── RabbitNotificationMessagePublisher.java
+        ├── RabbitNotificationConsumer.java
+        ├── RabbitNotificationConfig.java
         ├── SendGridEmailAdapter.java
         ├── FirebasePushAdapter.java
         ├── DiscordWebhookAdapter.java
@@ -202,6 +222,8 @@ El `docker-compose.yml` expone:
 API: http://localhost:8080/api
 Swagger UI: http://localhost:8080/swagger-ui.html
 MySQL: localhost:3306
+RabbitMQ AMQP: localhost:5672
+RabbitMQ Management: http://localhost:15672
 ```
 
 Valores por defecto de MySQL:
@@ -211,6 +233,16 @@ Database: escrims
 User: escrims_user
 Password: escrims_pass
 Root password: root_pass
+```
+
+Valores por defecto de RabbitMQ:
+
+```text
+User: escrims
+Password: escrims_pass
+Queue: escrims.notifications.dispatch
+Exchange: escrims.notifications
+Routing key: notification.dispatch
 ```
 
 La configuracion del perfil MySQL esta en `src/main/resources/application-mysql.properties`.
@@ -230,6 +262,11 @@ REMINDERS_HORAS_ANTES
 REMINDERS_INITIAL_DELAY_MILLIS
 REMINDERS_FIXED_DELAY_MILLIS
 DEMO_DATA_ENABLED
+NOTIFICATIONS_QUEUE
+SPRING_RABBITMQ_HOST
+SPRING_RABBITMQ_PORT
+SPRING_RABBITMQ_USERNAME
+SPRING_RABBITMQ_PASSWORD
 ```
 
 Docker Compose activa `DEMO_DATA_ENABLED=true`, por lo que al levantar la API se precargan
@@ -250,6 +287,12 @@ foxtrot  rol USER
 Tambien se crea un scrim confirmado de Valorant dentro de las proximas 2 horas para probar
 recordatorios automaticos, iCal y flujo de participantes, y un scrim casual de LoL en estado
 BUSCANDO.
+
+Docker Compose tambien activa `NOTIFICATIONS_QUEUE=rabbit`. En ese modo, las notificaciones
+se publican como mensajes JSON en RabbitMQ y un consumidor interno de Spring AMQP las procesa
+de forma asincronica segun el canal (`EMAIL`, `PUSH` o `DISCORD`). Si no se configura Rabbit,
+la aplicacion usa `QueuedNotificationDispatcher` en memoria para mantener tests y ejecucion
+local simples.
 
 Base URL:
 
@@ -312,7 +355,19 @@ las busquedas guardadas y genera alertas persistidas. Las notificaciones usan un
 con reintentos exponenciales antes de marcar una notificacion como fallida. La auditoria registra
 cambios de estado y acciones de moderacion.
 
-El scrim modela modalidad (`RANKED_LIKE`, `CASUAL`, `PRACTICA`). Para calendario, se expone
+El scrim modela modalidad (`RANKED_LIKE`, `CASUAL`, `PRACTICA`). Las reglas variables por juego
+se concentran en templates de `escrims.domain.rules`: `GameRulesTemplate` fija el algoritmo de
+validacion comun para creacion y postulacion, mientras Valorant, LoL y CS2 declaran formatos y
+roles permitidos. Los juegos no registrados usan un template generico para mantener el sistema
+multijuego extensible. `ScrimBuilder` valida creacion contra esos templates y `BuscandoState`
+valida roles al postular.
+
+La composicion de equipos se arma automaticamente desde las postulaciones aceptadas: `ScrimContext`
+mantiene Equipo A y Equipo B balanceados segun los cupos por lado. Si se mueve un jugador a
+suplente o se deshace el comando, la composicion se recalcula y se expone en las respuestas REST
+del scrim y del lobby de participantes.
+
+Para calendario, se expone
 un adapter iCal y un scheduler Spring que procesa recordatorios N horas antes y envia
 notificaciones simuladas a los participantes confirmados. Tambien existe un endpoint manual
 para disparar el procesamiento durante la demo. La moderacion de reportes pasa por una cadena
@@ -326,14 +381,18 @@ sin intervencion manual y el resto queda pendiente con la etapa registrada.
 | GET | `/api/auth/me` | Consultar usuario autenticado con `Authorization: Bearer <token>`. |
 | POST | `/api/auth/me/verificar-email` | Pasar email de pendiente a verificado. |
 | PUT | `/api/auth/me/perfil` | Editar perfil: juego, rango, roles, region, latencia y disponibilidad. |
+| GET | `/api/dashboard/me` | Resumen autenticado para frontend: perfil, mis scrims, alertas y proximos scrims. |
 | POST | `/api/busquedas-favoritas` | Guardar una busqueda favorita del usuario autenticado. |
 | GET | `/api/busquedas-favoritas` | Listar busquedas favoritas del usuario autenticado. |
 | GET | `/api/alertas` | Listar alertas generadas por scrims compatibles con las busquedas favoritas. |
+| GET | `/api/catalogos` | Consultar juegos soportados, formatos, roles y modalidades para frontend. |
 | POST | `/api/usuarios` | Crear usuario de prueba con juego, rango, latencia y verificacion. |
 | GET | `/api/usuarios` | Listar usuarios persistidos. |
 | POST | `/api/scrims` | Crear scrim. |
 | GET | `/api/scrims?juego=&formato=&region=&rangoMin=&rangoMax=&fecha=&latenciaMax=` | Buscar scrims por filtros. |
-| GET | `/api/scrims/{scrimId}` | Consultar estado del scrim. |
+| GET | `/api/scrims/mis-scrims` | Listar scrims donde participa el usuario autenticado, con rol y confirmacion. |
+| GET | `/api/scrims/{scrimId}` | Consultar estado del scrim, postulaciones y equipos A/B. |
+| GET | `/api/scrims/{scrimId}/participantes` | Obtener lobby agrupado por equipos A/B, aceptados, suplentes, pendientes y rechazados. |
 | POST | `/api/scrims/{scrimId}/postulaciones` | Postular usuario con rol. |
 | POST | `/api/scrims/{scrimId}/confirmaciones` | Confirmar asistencia. |
 | GET | `/api/scrims/{scrimId}/ical` | Descargar/generar el contenido iCal del scrim. |
@@ -343,6 +402,7 @@ sin intervencion manual y el resto queda pendiente con la etapa registrada.
 | POST | `/api/scrims/{scrimId}/roles/cambiar` | Cambiar el rol asignado a un jugador aceptado. |
 | POST | `/api/scrims/{scrimId}/roles/intercambiar` | Intercambiar roles entre dos jugadores aceptados. |
 | POST | `/api/scrims/{scrimId}/suplentes` | Mover un jugador aceptado a suplente y liberar un cupo. |
+| POST | `/api/scrims/{scrimId}/comandos/undo` | Deshacer el ultimo comando de gestion de roles/suplentes del scrim. |
 | POST | `/api/scrims/{scrimId}/estadisticas` | Registrar resultados y calcular MVP. |
 | POST | `/api/scrims/{scrimId}/feedback` | Cargar rating y comentario entre participantes de un scrim finalizado. |
 | GET | `/api/scrims/{scrimId}/feedback` | Listar feedback del scrim. |
@@ -397,4 +457,4 @@ mvn test
 mvn exec:java
 ```
 
-Resultado actual de tests: 70 ejecutados, 0 fallas, 0 errores.
+Resultado actual de tests: 77 ejecutados, 0 fallas, 0 errores.

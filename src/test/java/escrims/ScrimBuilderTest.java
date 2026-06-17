@@ -173,9 +173,29 @@ class ScrimBuilderTest {
     }
 
     @Test
-    @DisplayName("Builder: cuposTotales par válido (ej: 10) no lanza excepción")
+    @DisplayName("Builder: cuposTotales par válido para el formato no lanza excepción")
     void builderCuposParValidoNoLanzaExcepcion() {
-        assertDoesNotThrow(() -> scrimValido().cuposTotales(10).build());
+        assertDoesNotThrow(() -> scrimValido().formato("5v5").cuposTotales(10).build());
+    }
+
+    @Test
+    @DisplayName("Builder: Valorant 2v2 requiere 4 cupos totales")
+    void builderValorantValidaCuposContraFormato() {
+        IllegalStateException error = assertThrows(IllegalStateException.class, () ->
+                scrimValido().formato("2v2").cuposTotales(10).build()
+        );
+
+        assertTrue(error.getMessage().contains("requiere 4 cupos"));
+    }
+
+    @Test
+    @DisplayName("Builder: LoL no permite formato 3v3")
+    void builderLolRechazaFormatoNoPermitido() {
+        IllegalStateException error = assertThrows(IllegalStateException.class, () ->
+                scrimValido().juego("LoL").formato("3v3").cuposTotales(6).build()
+        );
+
+        assertTrue(error.getMessage().contains("no esta permitido"));
     }
 
     // ── Tests de validación de fecha ─────────────────────────────────

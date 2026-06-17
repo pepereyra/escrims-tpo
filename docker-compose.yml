@@ -7,6 +7,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: mysql
       MYSQL_HOST: mysql
@@ -22,6 +24,11 @@ services:
       REMINDERS_INITIAL_DELAY_MILLIS: 60000
       REMINDERS_FIXED_DELAY_MILLIS: 60000
       DEMO_DATA_ENABLED: true
+      NOTIFICATIONS_QUEUE: rabbit
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: escrims
+      SPRING_RABBITMQ_PASSWORD: escrims_pass
     ports:
       - "8080:8080"
 
@@ -43,5 +50,23 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: escrims-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: escrims
+      RABBITMQ_DEFAULT_PASS: escrims_pass
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - escrims_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   escrims_mysql_data:
+  escrims_rabbitmq_data:

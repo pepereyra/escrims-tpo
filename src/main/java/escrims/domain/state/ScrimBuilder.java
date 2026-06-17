@@ -5,6 +5,7 @@ import escrims.domain.matchmaking.ByLatencyStrategy;
 import escrims.domain.matchmaking.ByMMRStrategy;
 import escrims.domain.matchmaking.CompositeMatchmakingStrategy;
 import escrims.domain.matchmaking.MatchmakingStrategy;
+import escrims.domain.rules.GameRulesRegistry;
 import escrims.infra.events.DomainEventBus;
 import escrims.infra.events.ScrimCreadoEvent;
 
@@ -51,6 +52,7 @@ public class ScrimBuilder {
     private String modalidad = "CASUAL";
 
     private MatchmakingStrategy matchmakingStrategy;
+    private GameRulesRegistry gameRulesRegistry = new GameRulesRegistry();
 
     private final DomainEventBus eventBus;
 
@@ -110,6 +112,15 @@ public class ScrimBuilder {
 
     public ScrimBuilder matchmakingStrategy(MatchmakingStrategy matchmakingStrategy) {
         this.matchmakingStrategy = matchmakingStrategy;
+        return this;
+    }
+
+    public ScrimBuilder gameRulesRegistry(GameRulesRegistry gameRulesRegistry) {
+        if (gameRulesRegistry == null) {
+            throw new IllegalArgumentException("gameRulesRegistry no puede ser null");
+        }
+
+        this.gameRulesRegistry = gameRulesRegistry;
         return this;
     }
 
@@ -225,5 +236,7 @@ public class ScrimBuilder {
             throw new IllegalStateException("La modalidad debe ser RANKED_LIKE, CASUAL o PRACTICA");
         }
         modalidad = modalidadNormalizada;
+
+        gameRulesRegistry.obtenerPara(juego).validarCreacion(formato, cuposTotales, modalidad);
     }
 }

@@ -45,6 +45,8 @@ class ScrimCommandTest {
     void commandGestionaRolesYSuplentes() {
         ScrimContext scrim = crearScrim2v2();
         postularTodos(scrim);
+        assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
+        assertEquals(2, scrim.getEquipos().get(1).cantidadJugadores());
 
         controller.cambiarRol(scrim.getId(), alpha, Rol.MID);
         assertEquals("MID", postulacionDe(scrim, alpha).getRolDeseado().getNombre());
@@ -58,6 +60,38 @@ class ScrimCommandTest {
         assertEquals("SUPLENTE", postulacionDe(scrim, delta).getEstado().getNombre());
         assertEquals(1, scrim.cuposDisponibles());
         assertEquals("BUSCANDO", scrim.getState().getNombre());
+        assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
+        assertEquals(1, scrim.getEquipos().get(1).cantidadJugadores());
+    }
+
+    @Test
+    @DisplayName("Command permite deshacer cambios de rol, intercambio y movimiento a suplente")
+    void commandPermiteUndo() {
+        ScrimContext scrim = crearScrim2v2();
+        postularTodos(scrim);
+
+        controller.cambiarRol(scrim.getId(), alpha, Rol.MID);
+        assertEquals("MID", postulacionDe(scrim, alpha).getRolDeseado().getNombre());
+        controller.deshacerUltimoComando(scrim.getId());
+        assertEquals("DUELIST", postulacionDe(scrim, alpha).getRolDeseado().getNombre());
+
+        controller.intercambiarRoles(scrim.getId(), alpha, bravo);
+        assertEquals("SUPPORT", postulacionDe(scrim, alpha).getRolDeseado().getNombre());
+        assertEquals("DUELIST", postulacionDe(scrim, bravo).getRolDeseado().getNombre());
+        controller.deshacerUltimoComando(scrim.getId());
+        assertEquals("DUELIST", postulacionDe(scrim, alpha).getRolDeseado().getNombre());
+        assertEquals("SUPPORT", postulacionDe(scrim, bravo).getRolDeseado().getNombre());
+
+        controller.moverASuplente(scrim.getId(), delta);
+        assertEquals("SUPLENTE", postulacionDe(scrim, delta).getEstado().getNombre());
+        assertEquals("BUSCANDO", scrim.getState().getNombre());
+        assertEquals(1, scrim.getEquipos().get(1).cantidadJugadores());
+        controller.deshacerUltimoComando(scrim.getId());
+        assertEquals("ACEPTADA", postulacionDe(scrim, delta).getEstado().getNombre());
+        assertEquals("LOBBY_ARMADO", scrim.getState().getNombre());
+        assertEquals(0, scrim.cuposDisponibles());
+        assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
+        assertEquals(2, scrim.getEquipos().get(1).cantidadJugadores());
     }
 
     @Test

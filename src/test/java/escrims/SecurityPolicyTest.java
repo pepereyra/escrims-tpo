@@ -5,8 +5,11 @@ import escrims.domain.model.RecordatorioScrim;
 import escrims.domain.model.Usuario;
 import escrims.infra.events.DomainEventBus;
 import escrims.infra.notification.DevNotificadorFactory;
+import escrims.infra.notification.NotificationMessagePublisher;
+import escrims.infra.notification.NotificationQueueMessage;
 import escrims.infra.notification.NotificadorStrategy;
 import escrims.infra.notification.QueuedNotificationDispatcher;
+import escrims.infra.notification.RabbitNotificationDispatcher;
 import escrims.service.FixedWindowRateLimiter;
 import escrims.service.ScrimReminderScheduler;
 import escrims.service.ScrimService;
@@ -59,6 +62,21 @@ class SecurityPolicyTest {
     }
 
     @Test
+    @DisplayName("Cola externa publica mensajes de notificacion en RabbitMQ")
+    void colaExternaPublicaMensajesEnRabbit() {
+        CapturingPublisher publisher = new CapturingPublisher();
+        RabbitNotificationDispatcher dispatcher = new RabbitNotificationDispatcher(publisher);
+        Usuario usuario = new Usuario("RabbitUser", "rabbit@mail.com", "hash", "SA");
+        Notificacion notificacion = new Notificacion("CONFIRMADO", "EMAIL", "payload");
+
+        dispatcher.enqueue(usuario, notificacion, new DevNotificadorFactory().crearEmailNotificador());
+
+        assertEquals("RabbitUser", publisher.lastMessage.username());
+        assertEquals("EMAIL", publisher.lastMessage.canal());
+        assertEquals("CONFIRMADO", publisher.lastMessage.tipo());
+    }
+
+    @Test
     @DisplayName("Scheduler de recordatorios ejecuta el procesamiento automatico si esta habilitado")
     void schedulerRecordatoriosEjecutaSiEstaHabilitado() {
         CountingScrimService scrimService = new CountingScrimService();
@@ -94,6 +112,15 @@ class SecurityPolicyTest {
             ejecuciones.incrementAndGet();
             ultimasHorasAntes = horasAntes;
             return List.of();
+        }
+    }
+
+    private static class CapturingPublisher implements NotificationMessagePublisher {
+        private NotificationQueueMessage lastMessage;
+
+        @Override
+        public void publish(NotificationQueueMessage message) {
+            this.lastMessage = message;
         }
     }
 }

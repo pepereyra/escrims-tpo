@@ -176,6 +176,62 @@ public final class ApiDtos {
                                          LocalDateTime fechaCreacion) {
     }
 
+    public record DashboardMeResponse(UsuarioResponse usuario,
+                                      int misScrimsTotal,
+                                      int scrimsPorConfirmar,
+                                      int alertasTotal,
+                                      int busquedasFavoritasTotal,
+                                      List<MiScrimResponse> proximosScrims,
+                                      List<AlertaBusquedaResponse> alertasRecientes) {
+    }
+
+    public record MisScrimsResponse(List<MiScrimResponse> scrims) {
+    }
+
+    public record MiScrimResponse(UUID id,
+                                  String juego,
+                                  String formato,
+                                  String region,
+                                  String estado,
+                                  String modalidad,
+                                  int cuposTotales,
+                                  int cuposDisponibles,
+                                  LocalDateTime fechaHora,
+                                  String miRol,
+                                  String miEstadoPostulacion,
+                                  boolean confirmado,
+                                  boolean puedeConfirmar) {
+    }
+
+    public record ParticipantesScrimResponse(UUID scrimId,
+                                             String estado,
+                                             int cuposTotales,
+                                             int cuposDisponibles,
+                                             List<EquipoResponse> equipos,
+                                             List<ParticipanteScrimResponse> aceptados,
+                                             List<ParticipanteScrimResponse> suplentes,
+                                             List<ParticipanteScrimResponse> pendientes,
+                                             List<ParticipanteScrimResponse> rechazados) {
+    }
+
+    public record ParticipanteScrimResponse(String username,
+                                            String rol,
+                                            String estadoPostulacion,
+                                            boolean confirmado,
+                                            LocalDateTime fechaConfirmacion,
+                                            int rangoEnJuego,
+                                            int latenciaPromedio) {
+    }
+
+    public record CatalogosResponse(List<JuegoCatalogoResponse> juegos,
+                                    List<String> modalidades) {
+    }
+
+    public record JuegoCatalogoResponse(String juego,
+                                        List<String> formatosPermitidos,
+                                        List<String> rolesPermitidos) {
+    }
+
     public record AuditLogResponse(UUID id,
                                    String actor,
                                    String accion,
@@ -214,7 +270,11 @@ public final class ApiDtos {
                                 String modalidad,
                                 int cuposDisponibles,
                                 LocalDateTime fechaHora,
+                                List<EquipoResponse> equipos,
                                 List<PostulacionResponse> postulaciones) {
+    }
+
+    public record EquipoResponse(String lado, List<ParticipanteScrimResponse> jugadores) {
     }
 
     public record PostulacionResponse(String username, String rol, String estado) {
