@@ -61,6 +61,7 @@ public class BuscandoState implements ScrimState {
 
         Confirmacion confirmacion = new Confirmacion(u);
         ctx.getConfirmaciones().add(confirmacion);
+        ctx.recomponerEquipos();
 
         System.out.println("[BuscandoState] " + u.getUsername()
                 + " se postuló como " + rol

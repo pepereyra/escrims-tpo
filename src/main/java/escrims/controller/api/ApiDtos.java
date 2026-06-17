@@ -207,6 +207,7 @@ public final class ApiDtos {
                                              String estado,
                                              int cuposTotales,
                                              int cuposDisponibles,
+                                             List<EquipoResponse> equipos,
                                              List<ParticipanteScrimResponse> aceptados,
                                              List<ParticipanteScrimResponse> suplentes,
                                              List<ParticipanteScrimResponse> pendientes,
@@ -269,7 +270,11 @@ public final class ApiDtos {
                                 String modalidad,
                                 int cuposDisponibles,
                                 LocalDateTime fechaHora,
+                                List<EquipoResponse> equipos,
                                 List<PostulacionResponse> postulaciones) {
+    }
+
+    public record EquipoResponse(String lado, List<ParticipanteScrimResponse> jugadores) {
     }
 
     public record PostulacionResponse(String username, String rol, String estado) {

@@ -2,6 +2,7 @@ package escrims.controller.api;
 
 import escrims.domain.model.AlertaBusqueda;
 import escrims.domain.model.Confirmacion;
+import escrims.domain.model.Equipo;
 import escrims.domain.model.Postulacion;
 import escrims.domain.model.Usuario;
 import escrims.domain.state.ScrimContext;
@@ -83,6 +84,9 @@ public class FrontendRestController {
                 scrim.getState().getNombre(),
                 scrim.getCuposTotales(),
                 scrim.cuposDisponibles(),
+                scrim.getEquipos().stream()
+                        .map(equipo -> toEquipoResponse(scrim, equipo))
+                        .toList(),
                 participantesPorEstado(scrim, "ACEPTADA"),
                 participantesPorEstado(scrim, "SUPLENTE"),
                 participantesPorEstado(scrim, "PENDIENTE"),
@@ -139,6 +143,18 @@ public class FrontendRestController {
                 confirmacion == null ? null : confirmacion.getFechaConfirmacion(),
                 usuario.getRangoEnJuego(scrim.getJuego()),
                 usuario.getLatenciaPromedio()
+        );
+    }
+
+    private ApiDtos.EquipoResponse toEquipoResponse(ScrimContext scrim, Equipo equipo) {
+        return new ApiDtos.EquipoResponse(
+                equipo.getLado(),
+                equipo.getJugadores().stream()
+                        .map(usuario -> {
+                            Postulacion postulacion = postulacionDe(scrim, usuario);
+                            return toParticipanteResponse(scrim, postulacion);
+                        })
+                        .toList()
         );
     }
 

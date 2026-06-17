@@ -362,6 +362,11 @@ roles permitidos. Los juegos no registrados usan un template generico para mante
 multijuego extensible. `ScrimBuilder` valida creacion contra esos templates y `BuscandoState`
 valida roles al postular.
 
+La composicion de equipos se arma automaticamente desde las postulaciones aceptadas: `ScrimContext`
+mantiene Equipo A y Equipo B balanceados segun los cupos por lado. Si se mueve un jugador a
+suplente o se deshace el comando, la composicion se recalcula y se expone en las respuestas REST
+del scrim y del lobby de participantes.
+
 Para calendario, se expone
 un adapter iCal y un scheduler Spring que procesa recordatorios N horas antes y envia
 notificaciones simuladas a los participantes confirmados. Tambien existe un endpoint manual
@@ -386,8 +391,8 @@ sin intervencion manual y el resto queda pendiente con la etapa registrada.
 | POST | `/api/scrims` | Crear scrim. |
 | GET | `/api/scrims?juego=&formato=&region=&rangoMin=&rangoMax=&fecha=&latenciaMax=` | Buscar scrims por filtros. |
 | GET | `/api/scrims/mis-scrims` | Listar scrims donde participa el usuario autenticado, con rol y confirmacion. |
-| GET | `/api/scrims/{scrimId}` | Consultar estado del scrim. |
-| GET | `/api/scrims/{scrimId}/participantes` | Obtener lobby agrupado por aceptados, suplentes, pendientes y rechazados. |
+| GET | `/api/scrims/{scrimId}` | Consultar estado del scrim, postulaciones y equipos A/B. |
+| GET | `/api/scrims/{scrimId}/participantes` | Obtener lobby agrupado por equipos A/B, aceptados, suplentes, pendientes y rechazados. |
 | POST | `/api/scrims/{scrimId}/postulaciones` | Postular usuario con rol. |
 | POST | `/api/scrims/{scrimId}/confirmaciones` | Confirmar asistencia. |
 | GET | `/api/scrims/{scrimId}/ical` | Descargar/generar el contenido iCal del scrim. |

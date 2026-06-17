@@ -131,6 +131,7 @@ public class JpaScrimRepositoryAdapter implements ScrimRepository {
         entity.getPostulaciones().forEach(p -> scrim.getPostulaciones().add(toPostulacion(p)));
         entity.getConfirmaciones().forEach(c -> scrim.getConfirmaciones().add(toConfirmacion(c)));
         entity.getEstadisticas().forEach(e -> scrim.getEstadisticas().add(toEstadistica(e)));
+        scrim.recomponerEquipos();
         scrim.restaurarEstado(toState(entity.getEstado()));
 
         return scrim;

@@ -103,6 +103,7 @@ public class ScrimContext {
         this.postulaciones = new ArrayList<>();
         this.confirmaciones = new ArrayList<>();
         this.estadisticas = new ArrayList<>();
+        recomponerEquipos();
 
         this.state = new BuscandoState();
     }
@@ -135,6 +136,29 @@ public class ScrimContext {
 
     public void restaurarEstado(ScrimState estadoPersistido) {
         this.state = estadoPersistido;
+    }
+
+    public void recomponerEquipos() {
+        equipos.clear();
+        Equipo equipoA = new Equipo("A");
+        Equipo equipoB = new Equipo("B");
+
+        List<Usuario> aceptados = postulaciones.stream()
+                .filter(Postulacion::estaAceptada)
+                .map(Postulacion::getUsuario)
+                .toList();
+
+        int cuposPorLado = cuposTotales / 2;
+        for (int i = 0; i < aceptados.size(); i++) {
+            if (i < cuposPorLado) {
+                equipoA.agregarJugador(aceptados.get(i));
+            } else {
+                equipoB.agregarJugador(aceptados.get(i));
+            }
+        }
+
+        equipos.add(equipoA);
+        equipos.add(equipoB);
     }
 
     public void publicarEvento(DomainEvent evento) {
@@ -172,6 +196,7 @@ public class ScrimContext {
 
     public void restaurarPostulacion(Usuario usuario, Rol rol, String estado) {
         postulacionDe(usuario).restaurar(rol, estado);
+        recomponerEquipos();
     }
 
     public void restaurarConfirmacion(Confirmacion confirmacion) {
@@ -217,6 +242,8 @@ public class ScrimContext {
                     "BUSCANDO"
             ));
         }
+
+        recomponerEquipos();
     }
 
     private Postulacion postulacionAceptadaDe(Usuario usuario) {

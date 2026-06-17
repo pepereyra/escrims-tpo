@@ -132,6 +132,11 @@ class ScrimApiTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scrimId").value(scrimId.toString()))
+                .andExpect(jsonPath("$.equipos", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].lado").value("A"))
+                .andExpect(jsonPath("$.equipos[0].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[1].lado").value("B"))
+                .andExpect(jsonPath("$.equipos[1].jugadores", hasSize(2)))
                 .andExpect(jsonPath("$.aceptados", hasSize(4)))
                 .andExpect(jsonPath("$.aceptados[?(@.username == 'FrontAlpha')].rol").value(hasItem("DUELIST")))
                 .andExpect(jsonPath("$.aceptados[?(@.username == 'FrontAlpha')].confirmado").value(hasItem(false)));
@@ -261,6 +266,13 @@ class ScrimApiTest {
         postular(scrimId, "ApiBravo", "SUPPORT", "BUSCANDO");
         postular(scrimId, "ApiCharlie", "DUELIST", "BUSCANDO");
         postular(scrimId, "ApiDelta", "SUPPORT", "LOBBY_ARMADO");
+
+        mvc.perform(get("/api/scrims/{scrimId}", scrimId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.equipos", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[1].jugadores", hasSize(2)))
+                .andExpect(jsonPath("$.equipos[0].jugadores[?(@.username == 'ApiAlpha')].rol").value(hasItem("DUELIST")));
 
         mvc.perform(post("/api/scrims/{scrimId}/roles/intercambiar", scrimId)
                         .contentType(MediaType.APPLICATION_JSON)

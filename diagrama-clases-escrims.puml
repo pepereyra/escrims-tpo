@@ -156,7 +156,13 @@ package domain_model {
     }
 
     class Rol <<ValueObject>>
-    class Equipo
+    class Equipo {
+        - lado: String
+        - jugadores: List
+        + agregarJugador(): void
+        + removerJugador(): void
+        + estaCompleto(): boolean
+    }
     class Confirmacion
     class Estadistica
     class Feedback
@@ -208,6 +214,7 @@ package domain_state {
 
     class ScrimContext <<Context>> {
         - state: ScrimState
+        - equipos: List
         - postulaciones: List
         - confirmaciones: List
         - estadisticas: List
@@ -222,6 +229,7 @@ package domain_state {
         + cambiarRol(): void
         + intercambiarRoles(): void
         + moverASuplente(): void
+        + recomponerEquipos(): void
         + cuposDisponibles(): int
         + todosConfirmaron(): boolean
         + publicarEvento(): void
