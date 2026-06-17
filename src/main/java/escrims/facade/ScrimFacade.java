@@ -141,6 +141,10 @@ public class ScrimFacade {
         controller.moverASuplente(scrimId, usuario);
     }
 
+    public void reactivarTitular(UUID scrimId, Usuario usuario) {
+        controller.reactivarTitular(scrimId, usuario);
+    }
+
     public void configurarNotificacionesEmail(List<Usuario> destinatarios) {
         controller.configurarNotificacionesEmail(destinatarios);
     }

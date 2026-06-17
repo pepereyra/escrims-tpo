@@ -1,0 +1,47 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: escrims-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: escrims
+      MYSQL_USER: escrims_user
+      MYSQL_PASSWORD: escrims_pass
+      JWT_SECRET: docker-secret-change-me-12345678901234567890
+      RATE_LIMIT_MAX_REQUESTS: 200
+      RATE_LIMIT_WINDOW_MILLIS: 60000
+      REMINDERS_SCHEDULER_ENABLED: true
+      REMINDERS_HORAS_ANTES: 24
+      REMINDERS_INITIAL_DELAY_MILLIS: 60000
+      REMINDERS_FIXED_DELAY_MILLIS: 60000
+      DEMO_DATA_ENABLED: true
+    ports:
+      - "8080:8080"
+
+  mysql:
+    image: mysql:8.4
+    container_name: escrims-mysql
+    environment:
+      MYSQL_DATABASE: escrims
+      MYSQL_USER: escrims_user
+      MYSQL_PASSWORD: escrims_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - escrims_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  escrims_mysql_data:

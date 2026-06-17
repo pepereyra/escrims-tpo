@@ -104,6 +104,10 @@ public class ScrimController {
         scrimService.moverASuplente(scrimId, usuario);
     }
 
+    public void reactivarTitular(UUID scrimId, Usuario usuario) {
+        scrimService.reactivarTitular(scrimId, usuario);
+    }
+
     public List<Estadistica> registrarEstadisticas(UUID scrimId,
                                                    Map<Usuario, int[]> resultados) {
 

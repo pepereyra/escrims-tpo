@@ -33,6 +33,7 @@ public class UsuarioJpaEntity {
 
     private String juegoPrincipal;
     private int rangoPrincipal;
+    private String rangosPorJuego;
     private String rolesPreferidos;
     private String disponibilidad;
     private int latenciaPromedio;
@@ -51,6 +52,7 @@ public class UsuarioJpaEntity {
                             String region,
                             String juegoPrincipal,
                             int rangoPrincipal,
+                            String rangosPorJuego,
                             String rolesPreferidos,
                             String disponibilidad,
                             int latenciaPromedio,
@@ -65,6 +67,7 @@ public class UsuarioJpaEntity {
         this.region = region;
         this.juegoPrincipal = juegoPrincipal;
         this.rangoPrincipal = rangoPrincipal;
+        this.rangosPorJuego = rangosPorJuego;
         this.rolesPreferidos = rolesPreferidos;
         this.disponibilidad = disponibilidad;
         this.latenciaPromedio = latenciaPromedio;
@@ -75,8 +78,8 @@ public class UsuarioJpaEntity {
     }
 
     public static UsuarioJpaEntity fromDomain(Usuario usuario) {
-        String juego = usuario.getRangoPorJuego().keySet().stream().findFirst().orElse("");
-        int rango = juego.isBlank() ? 0 : usuario.getRangoEnJuego(juego);
+        String juegoPrincipal = resolverJuegoPrincipal(usuario);
+        int rango = juegoPrincipal.isBlank() ? 0 : usuario.getRangoEnJuego(juegoPrincipal);
 
         return new UsuarioJpaEntity(
                 usuario.getId(),
@@ -84,8 +87,9 @@ public class UsuarioJpaEntity {
                 usuario.getEmail(),
                 usuario.getPasswordHash(),
                 usuario.getRegion(),
-                juego,
+                juegoPrincipal,
                 rango,
+                serializarRangos(usuario.getRangoPorJuego()),
                 usuario.getRolesPreferidos().stream()
                         .map(Rol::getNombre)
                         .reduce((a, b) -> a + "," + b)
@@ -103,9 +107,10 @@ public class UsuarioJpaEntity {
         Usuario usuario = new Usuario(id, username, email, passwordHash, region, verificado, strikes, cooldownHasta, rolSistema);
         usuario.setLatenciaPromedio(latenciaPromedio);
         usuario.setDisponibilidad(disponibilidad);
+        usuario.setJuegoPrincipal(juegoPrincipal);
 
-        Map<String, Integer> rangos = new HashMap<>();
-        if (juegoPrincipal != null && !juegoPrincipal.isBlank()) {
+        Map<String, Integer> rangos = deserializarRangos(rangosPorJuego);
+        if (rangos.isEmpty() && juegoPrincipal != null && !juegoPrincipal.isBlank()) {
             rangos.put(juegoPrincipal, rangoPrincipal);
         }
         usuario.setRangoPorJuego(rangos);
@@ -117,6 +122,42 @@ public class UsuarioJpaEntity {
         }
 
         return usuario;
+    }
+
+    private static String resolverJuegoPrincipal(Usuario usuario) {
+        if (usuario.getJuegoPrincipal() != null && !usuario.getJuegoPrincipal().isBlank()) {
+            return usuario.getJuegoPrincipal();
+        }
+        return usuario.getRangoPorJuego().keySet().stream().findFirst().orElse("");
+    }
+
+    private static String serializarRangos(Map<String, Integer> rangos) {
+        if (rangos == null || rangos.isEmpty()) {
+            return "";
+        }
+        return rangos.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .reduce((a, b) -> a + ";" + b)
+                .orElse("");
+    }
+
+    private static Map<String, Integer> deserializarRangos(String serializado) {
+        Map<String, Integer> rangos = new HashMap<>();
+        if (serializado == null || serializado.isBlank()) {
+            return rangos;
+        }
+        for (String entry : serializado.split(";")) {
+            if (entry.isBlank() || !entry.contains("=")) {
+                continue;
+            }
+            String[] parts = entry.split("=", 2);
+            try {
+                rangos.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+            } catch (NumberFormatException ignored) {
+                // Ignorar entradas corruptas para no romper la carga del usuario.
+            }
+        }
+        return rangos;
     }
 
     public UUID getId() {

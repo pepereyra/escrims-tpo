@@ -52,6 +52,7 @@ public class AuthService {
         Map<String, Integer> rangos = new HashMap<>();
         rangos.put(juego, rango);
         usuario.setRangoPorJuego(rangos);
+        usuario.setJuegoPrincipal(juego);
 
         return usuarios.guardar(usuario);
     }
@@ -95,7 +96,8 @@ public class AuthService {
                                     Integer rango,
                                     Integer latencia,
                                     List<String> rolesPreferidos,
-                                    String disponibilidad) {
+                                    String disponibilidad,
+                                    Map<String, Integer> rangosPorJuego) {
         Usuario usuario = usuarioDesdeAuthorization(authorizationHeader);
 
         if (region != null && !region.isBlank()) {
@@ -110,10 +112,18 @@ public class AuthService {
         if (rolesPreferidos != null) {
             usuario.setRolesPreferidos(toRoles(rolesPreferidos));
         }
-        if (juegoPrincipal != null && !juegoPrincipal.isBlank() && rango != null) {
+        if (rangosPorJuego != null && !rangosPorJuego.isEmpty()) {
+            usuario.setRangoPorJuego(new HashMap<>(rangosPorJuego));
+            if (juegoPrincipal != null && !juegoPrincipal.isBlank()) {
+                usuario.setJuegoPrincipal(juegoPrincipal);
+            } else {
+                usuario.setJuegoPrincipal(rangosPorJuego.keySet().iterator().next());
+            }
+        } else if (juegoPrincipal != null && !juegoPrincipal.isBlank() && rango != null) {
             Map<String, Integer> rangos = new HashMap<>();
             rangos.put(juegoPrincipal, rango);
             usuario.setRangoPorJuego(rangos);
+            usuario.setJuegoPrincipal(juegoPrincipal);
         }
 
         return usuarios.guardar(usuario);

@@ -3,6 +3,7 @@ package escrims.controller.api;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ApiDtos {
@@ -42,7 +43,16 @@ public final class ApiDtos {
                                           Integer rango,
                                           Integer latencia,
                                           List<String> rolesPreferidos,
-                                          String disponibilidad) {
+                                          String disponibilidad,
+                                          Map<String, Integer> rangosPorJuego) {
+        public ActualizarPerfilRequest(String region,
+                                       String juegoPrincipal,
+                                       Integer rango,
+                                       Integer latencia,
+                                       List<String> rolesPreferidos,
+                                       String disponibilidad) {
+            this(region, juegoPrincipal, rango, latencia, rolesPreferidos, disponibilidad, null);
+        }
     }
 
     public record UsuarioResponse(UUID id,
@@ -51,6 +61,7 @@ public final class ApiDtos {
                                   String region,
                                   String juegoPrincipal,
                                   int rangoPrincipal,
+                                  Map<String, Integer> rangosPorJuego,
                                   int latenciaPromedio,
                                   List<String> rolesPreferidos,
                                   String disponibilidad,
@@ -213,6 +224,8 @@ public final class ApiDtos {
                                 int cuposTotales,
                                 String modalidad,
                                 int cuposDisponibles,
+                                int rangoMin,
+                                int rangoMax,
                                 LocalDateTime fechaHora,
                                 List<PostulacionResponse> postulaciones) {
     }

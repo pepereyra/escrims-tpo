@@ -38,6 +38,7 @@ public class UsuarioRestController {
         Map<String, Integer> rangos = new HashMap<>();
         rangos.put(request.juego(), request.rango());
         usuario.setRangoPorJuego(rangos);
+        usuario.setJuegoPrincipal(request.juego());
 
         if (request.verificarEmail()) {
             usuario.verificarEmail();
@@ -54,13 +55,15 @@ public class UsuarioRestController {
     }
 
     private ApiDtos.UsuarioResponse toResponse(Usuario usuario) {
+        String juegoPrincipal = resolverJuegoPrincipal(usuario);
         return new ApiDtos.UsuarioResponse(
                 usuario.getId(),
                 usuario.getUsername(),
                 usuario.getEmail(),
                 usuario.getRegion(),
-                usuario.getRangoPorJuego().keySet().stream().findFirst().orElse(""),
-                usuario.getRangoPorJuego().values().stream().findFirst().orElse(0),
+                juegoPrincipal,
+                usuario.getRangoEnJuego(juegoPrincipal),
+                new HashMap<>(usuario.getRangoPorJuego()),
                 usuario.getLatenciaPromedio(),
                 usuario.getRolesPreferidos().stream()
                         .map(rol -> rol.getNombre())
@@ -71,5 +74,12 @@ public class UsuarioRestController {
                 usuario.getStrikes(),
                 usuario.getCooldownHasta()
         );
+    }
+
+    private static String resolverJuegoPrincipal(Usuario usuario) {
+        if (usuario.getJuegoPrincipal() != null && !usuario.getJuegoPrincipal().isBlank()) {
+            return usuario.getJuegoPrincipal();
+        }
+        return usuario.getRangoPorJuego().keySet().stream().findFirst().orElse("");
     }
 }

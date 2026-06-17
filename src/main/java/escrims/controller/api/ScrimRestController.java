@@ -162,6 +162,13 @@ public class ScrimRestController {
         return toResponse(facade.getScrim(scrimId));
     }
 
+    @PostMapping("/scrims/{scrimId}/suplentes/reactivar")
+    public ApiDtos.ScrimResponse reactivarTitular(@PathVariable("scrimId") UUID scrimId,
+                                                  @RequestBody ApiDtos.UsuarioOperacionRequest request) {
+        facade.reactivarTitular(scrimId, usuarios.buscar(request.username()));
+        return toResponse(facade.getScrim(scrimId));
+    }
+
     @PostMapping("/scrims/{scrimId}/estadisticas")
     public List<ApiDtos.EstadisticaResponse> registrarEstadisticas(
             @PathVariable("scrimId") UUID scrimId,
@@ -219,6 +226,8 @@ public class ScrimRestController {
                 scrim.getCuposTotales(),
                 scrim.getModalidad(),
                 scrim.cuposDisponibles(),
+                scrim.getRangoMin(),
+                scrim.getRangoMax(),
                 scrim.getFechaHora(),
                 scrim.getPostulaciones().stream()
                         .map(postulacion -> new ApiDtos.PostulacionResponse(

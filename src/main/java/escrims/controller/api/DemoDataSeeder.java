@@ -66,13 +66,16 @@ public class DemoDataSeeder implements CommandLineRunner {
                                 int latencia,
                                 List<String> roles) {
         if (usuarios.existeUsername(username)) {
-            return usuarios.buscar(username);
+            Usuario existente = usuarios.buscar(username);
+            existente.setPasswordHash(passwordHasher.hash(DEMO_PASSWORD));
+            return usuarios.guardar(existente);
         }
 
         Usuario usuario = new Usuario(username, email, passwordHasher.hash(DEMO_PASSWORD), region);
         usuario.verificarEmail();
         usuario.setRolSistema(rolSistema);
         usuario.setRangoPorJuego(Map.of(juego, rango));
+        usuario.setJuegoPrincipal(juego);
         usuario.setLatenciaPromedio(latencia);
         usuario.setDisponibilidad("Lunes a viernes 20-24");
         usuario.setRolesPreferidos(roles.stream().map(Rol::new).toList());

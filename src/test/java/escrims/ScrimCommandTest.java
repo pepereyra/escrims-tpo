@@ -58,6 +58,12 @@ class ScrimCommandTest {
         assertEquals("SUPLENTE", postulacionDe(scrim, delta).getEstado().getNombre());
         assertEquals(1, scrim.cuposDisponibles());
         assertEquals("BUSCANDO", scrim.getState().getNombre());
+
+        controller.reactivarTitular(scrim.getId(), delta);
+
+        assertEquals("ACEPTADA", postulacionDe(scrim, delta).getEstado().getNombre());
+        assertEquals(0, scrim.cuposDisponibles());
+        assertEquals("LOBBY_ARMADO", scrim.getState().getNombre());
     }
 
     @Test

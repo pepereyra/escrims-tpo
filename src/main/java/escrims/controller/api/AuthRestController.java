@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthRestController {
@@ -66,18 +68,21 @@ public class AuthRestController {
                 request.rango(),
                 request.latencia(),
                 request.rolesPreferidos(),
-                request.disponibilidad()
+                request.disponibilidad(),
+                request.rangosPorJuego()
         ));
     }
 
     private ApiDtos.UsuarioResponse toResponse(Usuario usuario) {
+        String juegoPrincipal = resolverJuegoPrincipal(usuario);
         return new ApiDtos.UsuarioResponse(
                 usuario.getId(),
                 usuario.getUsername(),
                 usuario.getEmail(),
                 usuario.getRegion(),
-                usuario.getRangoPorJuego().keySet().stream().findFirst().orElse(""),
-                usuario.getRangoPorJuego().values().stream().findFirst().orElse(0),
+                juegoPrincipal,
+                usuario.getRangoEnJuego(juegoPrincipal),
+                new HashMap<>(usuario.getRangoPorJuego()),
                 usuario.getLatenciaPromedio(),
                 usuario.getRolesPreferidos().stream()
                         .map(rol -> rol.getNombre())
@@ -88,5 +93,12 @@ public class AuthRestController {
                 usuario.getStrikes(),
                 usuario.getCooldownHasta()
         );
+    }
+
+    private static String resolverJuegoPrincipal(Usuario usuario) {
+        if (usuario.getJuegoPrincipal() != null && !usuario.getJuegoPrincipal().isBlank()) {
+            return usuario.getJuegoPrincipal();
+        }
+        return usuario.getRangoPorJuego().keySet().stream().findFirst().orElse("");
     }
 }

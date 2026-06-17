@@ -14,6 +14,7 @@ public class Usuario {
     private String email;
     private String passwordHash;
     private Map<String, Integer> rangoPorJuego;
+    private String juegoPrincipal;
     private List<Rol> rolesPreferidos;
     private String region;
     private int latenciaPromedio;
@@ -105,6 +106,14 @@ public class Usuario {
 
     public void setRangoPorJuego(Map<String, Integer> rangoPorJuego) {
         this.rangoPorJuego = rangoPorJuego;
+    }
+
+    public String getJuegoPrincipal() {
+        return juegoPrincipal;
+    }
+
+    public void setJuegoPrincipal(String juegoPrincipal) {
+        this.juegoPrincipal = juegoPrincipal;
     }
 
     public List<Rol> getRolesPreferidos() {

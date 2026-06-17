@@ -1,0 +1,169 @@
+@startuml
+title Caso de Uso: Postulacion al Scrim\n4to jugador completa cupos y pasa a lobby
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam participant {
+    BackgroundColor #EEF2FF
+    BorderColor #4F46E5
+    FontColor #1E1B4B
+}
+skinparam actor {
+    BackgroundColor #FEF3C7
+    BorderColor #D97706
+}
+skinparam note {
+    BackgroundColor #F0FDF4
+    BorderColor #16A34A
+}
+skinparam ArrowColor #4F46E5
+
+actor "Usuario Delta" as U
+participant "ScrimFacade" as SF
+participant "ScrimController" as SC
+participant "ScrimService" as SS
+participant "ScrimContext" as CTX
+participant "BuscandoState" as BS
+participant "CompositeMatchmaking\nStrategy" as MMS
+participant "Postulacion" as POST
+participant "Confirmacion" as CONF
+participant "DomainEventBus" as BUS
+participant "NotificationSubscriber\nEmail" as NS_EMAIL
+participant "NotificationSubscriber\nPush" as NS_PUSH
+participant "EmailNotificador" as EMAIL
+participant "PushNotificador" as PUSH
+
+== Postulacion del cuarto jugador ==
+
+U -> SF : postular(scrimId, delta, SUPPORT)
+activate SF
+
+note right of SF
+  FACADE:
+  ScrimFacade es el punto de entrada
+  unico al subsistema.
+end note
+
+SF -> SC : postular(scrimId, delta, SUPPORT)
+activate SC
+
+SC -> SS : postular(scrimId, delta, SUPPORT)
+activate SS
+
+SS -> CTX : postular(delta, SUPPORT)
+activate CTX
+
+note right of CTX
+  STATE:
+  ScrimContext delega la operacion
+  al estado actual.
+end note
+
+CTX -> BS : postular(ctx, delta, SUPPORT)
+activate BS
+
+BS -> BS : validar usuario verificado
+BS -> BS : validar usuario no postulado
+BS -> BS : validar cupos disponibles
+BS -> CTX : getMatchmakingStrategy()
+CTX --> BS : MatchmakingStrategy
+BS -> MMS : esCompatible(delta, ctx)
+activate MMS
+MMS --> BS : true
+deactivate MMS
+
+note right of BS
+  STRATEGY:
+  BuscandoState delega MMR,
+  latencia e historial.
+end note
+
+BS -> POST : new Postulacion(delta, SUPPORT)
+activate POST
+POST --> BS : postulacion
+deactivate POST
+
+BS -> POST : aceptar()
+activate POST
+POST --> BS : ok
+deactivate POST
+
+BS -> CTX : agregar postulacion
+
+BS -> CONF : new Confirmacion(delta)
+activate CONF
+CONF --> BS : confirmacion
+deactivate CONF
+
+BS -> CTX : agregar confirmacion
+
+BS -> CTX : cuposDisponibles()
+activate CTX
+CTX --> BS : 0
+deactivate CTX
+
+== Transicion automatica ==
+
+BS -> CTX : setState(new LobbyArmadoState())
+activate CTX
+CTX --> BS : ok
+deactivate CTX
+
+BS -> CTX : publicarEvento(LOBBY_ARMADO)
+activate CTX
+
+CTX -> BUS : publish(evento)
+activate BUS
+
+note right of BUS
+  OBSERVER:
+  EventBus notifica a todos
+  los suscriptores registrados.
+end note
+
+== Notificaciones ==
+
+BUS -> NS_EMAIL : onEvent(evento)
+activate NS_EMAIL
+NS_EMAIL -> EMAIL : enviar(notificacion)
+activate EMAIL
+EMAIL --> NS_EMAIL : ok
+deactivate EMAIL
+NS_EMAIL --> BUS : ok
+deactivate NS_EMAIL
+
+BUS -> NS_PUSH : onEvent(evento)
+activate NS_PUSH
+NS_PUSH -> PUSH : enviar(notificacion)
+activate PUSH
+PUSH --> NS_PUSH : ok
+deactivate PUSH
+NS_PUSH --> BUS : ok
+deactivate NS_PUSH
+
+BUS --> CTX : ok
+deactivate BUS
+CTX --> BS : ok
+deactivate CTX
+BS --> CTX : ok
+deactivate BS
+CTX --> SS : ok
+deactivate CTX
+SS --> SC : ok
+deactivate SS
+SC --> SF : ScrimContext estado LOBBY_ARMADO
+deactivate SC
+SF --> U : ScrimContext estado LOBBY_ARMADO
+deactivate SF
+
+note over U, PUSH
+  El scrim paso de BUSCANDO a LOBBY_ARMADO.
+  Los participantes reciben notificaciones.
+  Luego todos deben confirmar.
+end note
+
+@enduml

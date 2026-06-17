@@ -535,8 +535,16 @@ class ScrimApiTest {
                 .andExpect(jsonPath("$.cuposDisponibles").value(1))
                 .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiRoleDelta')].estado").value(hasItem("SUPLENTE")));
 
+        mvc.perform(post("/api/scrims/{scrimId}/suplentes/reactivar", scrimId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.UsuarioOperacionRequest("ApiRoleDelta"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("LOBBY_ARMADO"))
+                .andExpect(jsonPath("$.cuposDisponibles").value(0))
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiRoleDelta')].estado").value(hasItem("ACEPTADA")));
+
         assertEquals(4, countRows("postulaciones", scrimId));
-        assertEquals(3, countRows("confirmaciones", scrimId));
+        assertEquals(4, countRows("confirmaciones", scrimId));
     }
 
     @Test

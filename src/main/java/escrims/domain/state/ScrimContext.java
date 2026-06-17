@@ -204,6 +204,40 @@ public class ScrimContext {
         }
     }
 
+    public void reactivarTitular(Usuario usuario) {
+        validarGestionPreJuego();
+
+        Postulacion postulacion = postulacionSuplenteDe(usuario);
+
+        if (cuposDisponibles() <= 0) {
+            throw new IllegalStateException(
+                    "No hay cupos disponibles para reactivar a " + usuario.getUsername() + "."
+            );
+        }
+
+        postulacion.aceptar();
+        confirmaciones.add(new Confirmacion(usuario));
+
+        if (cuposDisponibles() == 0 && state.getNombre().equals("BUSCANDO")) {
+            setState(new LobbyArmadoState());
+            publicarEvento(new ScrimStateChangedEvent(
+                    id,
+                    "BUSCANDO",
+                    "LOBBY_ARMADO"
+            ));
+        }
+    }
+
+    private Postulacion postulacionSuplenteDe(Usuario usuario) {
+        return postulaciones.stream()
+                .filter(p -> "SUPLENTE".equals(p.getEstado().getNombre()))
+                .filter(p -> p.getUsuario().getId().equals(usuario.getId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El usuario " + usuario.getUsername() + " no es suplente en este scrim."
+                ));
+    }
+
     private Postulacion postulacionAceptadaDe(Usuario usuario) {
         return postulaciones.stream()
                 .filter(Postulacion::estaAceptada)
