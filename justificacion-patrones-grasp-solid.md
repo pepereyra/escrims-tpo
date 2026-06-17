@@ -88,6 +88,8 @@ if (ctx.cuposDisponibles() == 0) {
 - ✅ Cada estado concreto implementa **todos** los métodos de la interfaz (los que no aplican
   lanzan `IllegalStateException` con mensaje descriptivo).
 
+_Aclaracion de mejora: La interfaz podría optimizarse mediante una clase abstracta con implementaciones por defecto para evitar código repetido en los estados terminales. Sin embargo, mantener todas las operaciones en la interfaz ScrimState es una implementación válida y común del patrón State, ya que representa todas las acciones que el contexto puede delegar a sus estados. De todos modos, en el codigo se tienen todas las excepciones correspondientes._
+
 ---
 
 ### 1.3 Patrón STRATEGY — Matchmaking y canal de notificación intercambiable
