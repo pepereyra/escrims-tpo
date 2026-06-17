@@ -164,6 +164,13 @@ public class ScrimRestController {
         return toResponse(facade.getScrim(scrimId));
     }
 
+    @PostMapping("/scrims/{scrimId}/suplentes/reactivar")
+    public ApiDtos.ScrimResponse reactivarTitular(@PathVariable("scrimId") UUID scrimId,
+                                                  @RequestBody ApiDtos.UsuarioOperacionRequest request) {
+        facade.reactivarTitular(scrimId, usuarios.buscar(request.username()));
+        return toResponse(facade.getScrim(scrimId));
+    }
+
     @PostMapping("/scrims/{scrimId}/comandos/undo")
     public ApiDtos.ScrimResponse deshacerUltimoComando(@PathVariable("scrimId") UUID scrimId) {
         facade.deshacerUltimoComando(scrimId);

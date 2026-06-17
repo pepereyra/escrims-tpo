@@ -7,7 +7,7 @@ import escrims.domain.model.Rol;
 import escrims.domain.model.Usuario;
 
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,7 +49,7 @@ public class AuthService {
         usuario.setRolSistema("USER");
         usuario.setRolesPreferidos(toRoles(rolesPreferidos));
 
-        Map<String, Integer> rangos = new HashMap<>();
+        Map<String, Integer> rangos = new LinkedHashMap<>();
         rangos.put(juego, rango);
         usuario.setRangoPorJuego(rangos);
 
@@ -93,6 +93,7 @@ public class AuthService {
                                     String region,
                                     String juegoPrincipal,
                                     Integer rango,
+                                    Map<String, Integer> rangosPorJuego,
                                     Integer latencia,
                                     List<String> rolesPreferidos,
                                     String disponibilidad) {
@@ -110,8 +111,15 @@ public class AuthService {
         if (rolesPreferidos != null) {
             usuario.setRolesPreferidos(toRoles(rolesPreferidos));
         }
-        if (juegoPrincipal != null && !juegoPrincipal.isBlank() && rango != null) {
-            Map<String, Integer> rangos = new HashMap<>();
+        if (rangosPorJuego != null && !rangosPorJuego.isEmpty()) {
+            Map<String, Integer> rangos = new LinkedHashMap<>();
+            if (juegoPrincipal != null && !juegoPrincipal.isBlank() && rangosPorJuego.containsKey(juegoPrincipal)) {
+                rangos.put(juegoPrincipal, rangosPorJuego.get(juegoPrincipal));
+            }
+            rangosPorJuego.forEach(rangos::putIfAbsent);
+            usuario.setRangoPorJuego(rangos);
+        } else if (juegoPrincipal != null && !juegoPrincipal.isBlank() && rango != null) {
+            Map<String, Integer> rangos = new LinkedHashMap<>();
             rangos.put(juegoPrincipal, rango);
             usuario.setRangoPorJuego(rangos);
         }

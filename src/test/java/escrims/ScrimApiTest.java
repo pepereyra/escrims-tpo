@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -200,6 +201,7 @@ class ScrimApiTest {
                                 "BR",
                                 "LoL",
                                 1700,
+                                Map.of("LoL", 1700, "Valorant", 1600),
                                 45,
                                 List.of("JUNGLA", "MID"),
                                 "Martes y jueves"
@@ -208,6 +210,8 @@ class ScrimApiTest {
                 .andExpect(jsonPath("$.region").value("BR"))
                 .andExpect(jsonPath("$.juegoPrincipal").value("LoL"))
                 .andExpect(jsonPath("$.rangoPrincipal").value(1700))
+                .andExpect(jsonPath("$.rangosPorJuego.LoL").value(1700))
+                .andExpect(jsonPath("$.rangosPorJuego.Valorant").value(1600))
                 .andExpect(jsonPath("$.rolesPreferidos").value(hasItem("JUNGLA")))
                 .andExpect(jsonPath("$.disponibilidad").value("Martes y jueves"));
 
@@ -602,8 +606,8 @@ class ScrimApiTest {
     }
 
     @Test
-    @DisplayName("API REST permite mover un jugador aceptado a suplente")
-    void apiRestPermiteMoverJugadorASuplente() throws Exception {
+    @DisplayName("API REST permite mover un jugador aceptado a suplente y reactivarlo")
+    void apiRestPermiteMoverJugadorASuplenteYReactivarlo() throws Exception {
         LocalDateTime fechaHora = LocalDateTime.now().plusHours(2).withNano(0);
 
         crearUsuario("ApiRoleAlpha", "api-role-alpha@mail.com", 1500, 30);
@@ -628,6 +632,17 @@ class ScrimApiTest {
 
         assertEquals(4, countRows("postulaciones", scrimId));
         assertEquals(3, countRows("confirmaciones", scrimId));
+
+        mvc.perform(post("/api/scrims/{scrimId}/suplentes/reactivar", scrimId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(new ApiDtos.UsuarioOperacionRequest("ApiRoleDelta"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("LOBBY_ARMADO"))
+                .andExpect(jsonPath("$.cuposDisponibles").value(0))
+                .andExpect(jsonPath("$.postulaciones[?(@.username == 'ApiRoleDelta')].estado").value(hasItem("ACEPTADA")));
+
+        assertEquals(4, countRows("postulaciones", scrimId));
+        assertEquals(4, countRows("confirmaciones", scrimId));
     }
 
     @Test

@@ -3,6 +3,7 @@ package escrims.service;
 import escrims.domain.command.CambiarRolCommand;
 import escrims.domain.command.IntercambiarRolesCommand;
 import escrims.domain.command.MoverASuplenteCommand;
+import escrims.domain.command.ReactivarTitularCommand;
 import escrims.domain.command.ScrimCommand;
 import escrims.domain.model.Estadistica;
 import escrims.domain.model.Notificacion;
@@ -171,6 +172,11 @@ public class ScrimService {
         ScrimContext scrim = getScrim(scrimId);
         ejecutar(scrim, new MoverASuplenteCommand(scrim, usuario));
         notificarListaEspera(scrim, usuario);
+    }
+
+    public void reactivarTitular(UUID scrimId, Usuario usuario) {
+        ScrimContext scrim = getScrim(scrimId);
+        ejecutar(scrim, new ReactivarTitularCommand(scrim, usuario));
     }
 
     private void notificarListaEspera(ScrimContext scrim, Usuario usuarioMovido) {

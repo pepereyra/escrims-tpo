@@ -3,6 +3,7 @@ package escrims.controller.api;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ApiDtos {
@@ -40,9 +41,18 @@ public final class ApiDtos {
     public record ActualizarPerfilRequest(String region,
                                           String juegoPrincipal,
                                           Integer rango,
+                                          Map<String, Integer> rangosPorJuego,
                                           Integer latencia,
                                           List<String> rolesPreferidos,
                                           String disponibilidad) {
+        public ActualizarPerfilRequest(String region,
+                                       String juegoPrincipal,
+                                       Integer rango,
+                                       Integer latencia,
+                                       List<String> rolesPreferidos,
+                                       String disponibilidad) {
+            this(region, juegoPrincipal, rango, null, latencia, rolesPreferidos, disponibilidad);
+        }
     }
 
     public record UsuarioResponse(UUID id,
@@ -51,6 +61,7 @@ public final class ApiDtos {
                                   String region,
                                   String juegoPrincipal,
                                   int rangoPrincipal,
+                                  Map<String, Integer> rangosPorJuego,
                                   int latenciaPromedio,
                                   List<String> rolesPreferidos,
                                   String disponibilidad,

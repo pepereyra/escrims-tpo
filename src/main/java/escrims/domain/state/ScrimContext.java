@@ -210,6 +210,10 @@ public class ScrimContext {
         }
     }
 
+    public void removerConfirmacion(Usuario usuario) {
+        confirmaciones.removeIf(c -> c.getUsuario().getId().equals(usuario.getId()));
+    }
+
     public void cambiarRol(Usuario usuario, Rol nuevoRol) {
         validarGestionPreJuego();
         postulacionAceptadaDe(usuario).cambiarRol(nuevoRol);
@@ -240,6 +244,37 @@ public class ScrimContext {
                     id,
                     estadoAnterior,
                     "BUSCANDO"
+            ));
+        }
+
+        recomponerEquipos();
+    }
+
+    public void reactivarTitular(Usuario usuario) {
+        validarGestionPreJuego();
+
+        if (cuposDisponibles() <= 0) {
+            throw new IllegalStateException("No hay cupos disponibles para reactivar un suplente.");
+        }
+
+        Postulacion postulacion = postulacionDe(usuario);
+        if (!"SUPLENTE".equals(postulacion.getEstado().getNombre())) {
+            throw new IllegalArgumentException(
+                    "El usuario " + usuario.getUsername() + " no esta como suplente en este scrim."
+            );
+        }
+
+        postulacion.aceptar();
+        if (getConfirmacionDeUsuario(usuario) == null) {
+            confirmaciones.add(new Confirmacion(usuario));
+        }
+
+        if (cuposDisponibles() == 0 && state.getNombre().equals("BUSCANDO")) {
+            setState(new LobbyArmadoState());
+            publicarEvento(new ScrimStateChangedEvent(
+                    id,
+                    "BUSCANDO",
+                    "LOBBY_ARMADO"
             ));
         }
 

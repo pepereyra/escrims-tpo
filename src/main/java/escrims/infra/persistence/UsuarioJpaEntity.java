@@ -2,13 +2,18 @@ package escrims.infra.persistence;
 
 import escrims.domain.model.Usuario;
 import escrims.domain.model.Rol;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,6 +38,11 @@ public class UsuarioJpaEntity {
 
     private String juegoPrincipal;
     private int rangoPrincipal;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "usuario_rangos_juego", joinColumns = @JoinColumn(name = "usuario_id"))
+    @MapKeyColumn(name = "juego")
+    @Column(name = "rango", nullable = false)
+    private Map<String, Integer> rangosPorJuego = new LinkedHashMap<>();
     private String rolesPreferidos;
     private String disponibilidad;
     private int latenciaPromedio;
@@ -51,6 +61,7 @@ public class UsuarioJpaEntity {
                             String region,
                             String juegoPrincipal,
                             int rangoPrincipal,
+                            Map<String, Integer> rangosPorJuego,
                             String rolesPreferidos,
                             String disponibilidad,
                             int latenciaPromedio,
@@ -65,6 +76,7 @@ public class UsuarioJpaEntity {
         this.region = region;
         this.juegoPrincipal = juegoPrincipal;
         this.rangoPrincipal = rangoPrincipal;
+        this.rangosPorJuego = rangosPorJuego == null ? new LinkedHashMap<>() : new LinkedHashMap<>(rangosPorJuego);
         this.rolesPreferidos = rolesPreferidos;
         this.disponibilidad = disponibilidad;
         this.latenciaPromedio = latenciaPromedio;
@@ -75,7 +87,8 @@ public class UsuarioJpaEntity {
     }
 
     public static UsuarioJpaEntity fromDomain(Usuario usuario) {
-        String juego = usuario.getRangoPorJuego().keySet().stream().findFirst().orElse("");
+        Map<String, Integer> rangos = usuario.getRangoPorJuego();
+        String juego = rangos.keySet().stream().findFirst().orElse("");
         int rango = juego.isBlank() ? 0 : usuario.getRangoEnJuego(juego);
 
         return new UsuarioJpaEntity(
@@ -86,6 +99,7 @@ public class UsuarioJpaEntity {
                 usuario.getRegion(),
                 juego,
                 rango,
+                rangos,
                 usuario.getRolesPreferidos().stream()
                         .map(Rol::getNombre)
                         .reduce((a, b) -> a + "," + b)
@@ -104,8 +118,10 @@ public class UsuarioJpaEntity {
         usuario.setLatenciaPromedio(latenciaPromedio);
         usuario.setDisponibilidad(disponibilidad);
 
-        Map<String, Integer> rangos = new HashMap<>();
-        if (juegoPrincipal != null && !juegoPrincipal.isBlank()) {
+        Map<String, Integer> rangos = new LinkedHashMap<>();
+        if (rangosPorJuego != null && !rangosPorJuego.isEmpty()) {
+            rangos.putAll(rangosPorJuego);
+        } else if (juegoPrincipal != null && !juegoPrincipal.isBlank()) {
             rangos.put(juegoPrincipal, rangoPrincipal);
         }
         usuario.setRangoPorJuego(rangos);

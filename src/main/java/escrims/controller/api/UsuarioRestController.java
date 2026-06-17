@@ -61,6 +61,7 @@ public class UsuarioRestController {
                 usuario.getRegion(),
                 usuario.getRangoPorJuego().keySet().stream().findFirst().orElse(""),
                 usuario.getRangoPorJuego().values().stream().findFirst().orElse(0),
+                usuario.getRangoPorJuego(),
                 usuario.getLatenciaPromedio(),
                 usuario.getRolesPreferidos().stream()
                         .map(rol -> rol.getNombre())

@@ -2,7 +2,7 @@ package escrims.domain.model;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -65,7 +65,7 @@ public class Usuario {
         this.email = email;
         this.passwordHash = passwordHash;
         this.region = region;
-        this.rangoPorJuego = new HashMap<>();
+        this.rangoPorJuego = new LinkedHashMap<>();
         this.rolesPreferidos = new ArrayList<>();
         this.latenciaPromedio = 0;
         this.disponibilidad = "";
@@ -104,7 +104,7 @@ public class Usuario {
     }
 
     public void setRangoPorJuego(Map<String, Integer> rangoPorJuego) {
-        this.rangoPorJuego = rangoPorJuego;
+        this.rangoPorJuego = rangoPorJuego == null ? new LinkedHashMap<>() : new LinkedHashMap<>(rangoPorJuego);
     }
 
     public List<Rol> getRolesPreferidos() {

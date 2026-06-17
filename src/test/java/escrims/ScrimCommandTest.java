@@ -62,6 +62,14 @@ class ScrimCommandTest {
         assertEquals("BUSCANDO", scrim.getState().getNombre());
         assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
         assertEquals(1, scrim.getEquipos().get(1).cantidadJugadores());
+
+        controller.reactivarTitular(scrim.getId(), delta);
+
+        assertEquals("ACEPTADA", postulacionDe(scrim, delta).getEstado().getNombre());
+        assertEquals(0, scrim.cuposDisponibles());
+        assertEquals("LOBBY_ARMADO", scrim.getState().getNombre());
+        assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
+        assertEquals(2, scrim.getEquipos().get(1).cantidadJugadores());
     }
 
     @Test
@@ -92,6 +100,13 @@ class ScrimCommandTest {
         assertEquals(0, scrim.cuposDisponibles());
         assertEquals(2, scrim.getEquipos().get(0).cantidadJugadores());
         assertEquals(2, scrim.getEquipos().get(1).cantidadJugadores());
+
+        controller.moverASuplente(scrim.getId(), delta);
+        controller.reactivarTitular(scrim.getId(), delta);
+        assertEquals("ACEPTADA", postulacionDe(scrim, delta).getEstado().getNombre());
+        controller.deshacerUltimoComando(scrim.getId());
+        assertEquals("SUPLENTE", postulacionDe(scrim, delta).getEstado().getNombre());
+        assertEquals("BUSCANDO", scrim.getState().getNombre());
     }
 
     @Test
