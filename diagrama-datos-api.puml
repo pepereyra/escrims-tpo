@@ -1,0 +1,813 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classHeaderBackgroundColor #DDEEFF
+skinparam packageBackgroundColor #F8F8FF
+left to right direction
+
+title eScrims - Diagrama de datos API REST
+
+package "Controladores REST" {
+    class AuthRestController <<RestController>> {
+        - authService: AuthService
+        + AuthRestController(authService: AuthService)
+        + register(request: ApiDtos.RegisterRequest): ApiDtos.AuthResponse
+        + login(request: ApiDtos.LoginRequest): ApiDtos.AuthResponse
+        + me(authorization: String): ApiDtos.UsuarioResponse
+        + verificarEmail(authorization: String): ApiDtos.UsuarioResponse
+        + actualizarPerfil(authorization: String, request: ApiDtos.ActualizarPerfilRequest): ApiDtos.UsuarioResponse
+        - toResponse(usuario: Usuario): ApiDtos.UsuarioResponse
+        }
+
+    class UsuarioRestController <<RestController>> {
+        - usuarios: UsuarioApiRepository
+        + UsuarioRestController(usuarios: UsuarioApiRepository)
+        + crear(request: ApiDtos.CrearUsuarioRequest): ApiDtos.UsuarioResponse
+        + listar(): List<ApiDtos.UsuarioResponse>
+        - toResponse(usuario: Usuario): ApiDtos.UsuarioResponse
+        }
+
+    class ScrimRestController <<RestController>> {
+        - facade: ScrimFacade
+        - usuarios: UsuarioApiRepository
+        + ScrimRestController(facade: ScrimFacade, usuarios: UsuarioApiRepository)
+        + crearScrim(request: ApiDtos.CrearScrimRequest): ApiDtos.ScrimResponse
+        + obtenerScrim(scrimId: UUID): ApiDtos.ScrimResponse
+        + buscarScrims(juego: String, formato: String, region: String, rangoMin: Integer, rangoMax: Integer, fecha: LocalDateTime, latenciaMax: Integer): List<ApiDtos.ScrimResponse>
+        + postular(scrimId: UUID, request: ApiDtos.PostulacionRequest): ApiDtos.ScrimResponse
+        + confirmar(scrimId: UUID, request: ApiDtos.UsuarioOperacionRequest): ApiDtos.ScrimResponse
+        + iniciar(scrimId: UUID): ApiDtos.ScrimResponse
+        + procesarScheduler(request: ApiDtos.SchedulerRequest): ApiDtos.SchedulerResponse
+        + generarIcal(scrimId: UUID): ApiDtos.IcalResponse
+        + procesarRecordatorios(request: ApiDtos.RecordatoriosRequest): List<ApiDtos.RecordatorioResponse>
+        + finalizar(scrimId: UUID): ApiDtos.ScrimResponse
+        + cancelar(scrimId: UUID): ApiDtos.ScrimResponse
+        + cambiarRol(scrimId: UUID, request: ApiDtos.CambiarRolRequest): ApiDtos.ScrimResponse
+        + intercambiarRoles(scrimId: UUID, request: ApiDtos.IntercambiarRolesRequest): ApiDtos.ScrimResponse
+        + moverASuplente(scrimId: UUID, request: ApiDtos.UsuarioOperacionRequest): ApiDtos.ScrimResponse
+        + reactivarTitular(scrimId: UUID, request: ApiDtos.UsuarioOperacionRequest): ApiDtos.ScrimResponse
+        + deshacerUltimoComando(scrimId: UUID): ApiDtos.ScrimResponse
+        + registrarEstadisticas(scrimId: UUID, request: ApiDtos.RegistrarEstadisticasRequest): List<ApiDtos.EstadisticaResponse>
+        + configurarEmail(request: ApiDtos.NotificacionesRequest): void
+        + configurarPush(request: ApiDtos.NotificacionesRequest): void
+        + configurarDiscord(request: ApiDtos.NotificacionesRequest): void
+        - buscarUsuarios(request: ApiDtos.NotificacionesRequest): List<Usuario>
+        - coincide(filtro: String, valor: String): boolean
+        - toResponse(scrim: ScrimContext): ApiDtos.ScrimResponse
+        - toEquipoResponse(scrim: ScrimContext, equipo: Equipo): ApiDtos.EquipoResponse
+        - toParticipanteResponse(scrim: ScrimContext, usuario: Usuario): ApiDtos.ParticipanteScrimResponse
+        - toResponse(estadistica: Estadistica): ApiDtos.EstadisticaResponse
+        - toResponse(recordatorio: RecordatorioScrim): ApiDtos.RecordatorioResponse
+        }
+
+    class FrontendRestController <<RestController>> {
+        - facade: ScrimFacade
+        - authService: AuthService
+        - busquedaFavoritaService: BusquedaFavoritaService
+        + FrontendRestController(facade: ScrimFacade, authService: AuthService, busquedaFavoritaService: BusquedaFavoritaService)
+        + dashboard(authorization: String): ApiDtos.DashboardMeResponse
+        + misScrims(authorization: String): ApiDtos.MisScrimsResponse
+        + participantes(authorization: String, scrimId: UUID): ApiDtos.ParticipantesScrimResponse
+        - misScrimsDe(usuario: Usuario): List<ApiDtos.MiScrimResponse>
+        - toMiScrimResponse(scrim: ScrimContext, usuario: Usuario): ApiDtos.MiScrimResponse
+        - participantesPorEstado(scrim: ScrimContext, estado: String): List<ApiDtos.ParticipanteScrimResponse>
+        - toParticipanteResponse(scrim: ScrimContext, postulacion: Postulacion): ApiDtos.ParticipanteScrimResponse
+        - toEquipoResponse(scrim: ScrimContext, equipo: Equipo): ApiDtos.EquipoResponse
+        - postulacionDe(scrim: ScrimContext, usuario: Usuario): Postulacion
+        - confirmacionDe(scrim: ScrimContext, usuario: Usuario): Confirmacion
+        - toUsuarioResponse(usuario: Usuario): ApiDtos.UsuarioResponse
+        - toAlertaResponse(alerta: AlertaBusqueda): ApiDtos.AlertaBusquedaResponse
+        }
+
+    class BusquedaFavoritaRestController <<RestController>> {
+        - service: BusquedaFavoritaService
+        - authService: AuthService
+        + BusquedaFavoritaRestController(service: BusquedaFavoritaService, authService: AuthService)
+        + guardar(authorization: String, request: ApiDtos.BusquedaFavoritaRequest): ApiDtos.BusquedaFavoritaResponse
+        + listarBusquedas(authorization: String): List<ApiDtos.BusquedaFavoritaResponse>
+        + listarAlertas(authorization: String): List<ApiDtos.AlertaBusquedaResponse>
+        - toResponse(busqueda: BusquedaFavorita): ApiDtos.BusquedaFavoritaResponse
+        - toResponse(alerta: AlertaBusqueda): ApiDtos.AlertaBusquedaResponse
+        }
+
+    class ModeracionRestController <<RestController>> {
+        - moderacionService: ModeracionService
+        - usuarios: UsuarioApiRepository
+        - authService: AuthService
+        - auditService: AuditService
+        + ModeracionRestController(moderacionService: ModeracionService, usuarios: UsuarioApiRepository, authService: AuthService, auditService: AuditService)
+        + registrarFeedback(scrimId: UUID, request: ApiDtos.FeedbackRequest): ApiDtos.FeedbackResponse
+        + listarFeedback(scrimId: UUID): List<ApiDtos.FeedbackResponse>
+        + aprobarFeedback(feedbackId: UUID, authorization: String): ApiDtos.FeedbackResponse
+        + rechazarFeedback(feedbackId: UUID, authorization: String): ApiDtos.FeedbackResponse
+        + registrarReporte(scrimId: UUID, request: ApiDtos.ReporteConductaRequest): ApiDtos.ReporteConductaResponse
+        + listarReportes(scrimId: UUID): List<ApiDtos.ReporteConductaResponse>
+        + aprobarReporte(reporteId: UUID, authorization: String, request: ApiDtos.ResolverReporteRequest): ApiDtos.ReporteConductaResponse
+        + rechazarReporte(reporteId: UUID, authorization: String): ApiDtos.ReporteConductaResponse
+        - toResponse(feedback: Feedback): ApiDtos.FeedbackResponse
+        - toResponse(reporte: ReporteConducta): ApiDtos.ReporteConductaResponse
+        }
+
+    class CatalogoRestController <<RestController>> {
+        - gameRulesRegistry: GameRulesRegistry
+        + catalogos(): ApiDtos.CatalogosResponse
+        }
+
+    class AuditRestController <<RestController>> {
+        - auditService: AuditService
+        - authService: AuthService
+        + AuditRestController(auditService: AuditService, authService: AuthService)
+        + listar(authorization: String): List<ApiDtos.AuditLogResponse>
+        - toResponse(log: AuditLog): ApiDtos.AuditLogResponse
+        }
+
+    class ApiExceptionHandler <<RestControllerAdvice>> {
+        + handleIllegalArgument(e: IllegalArgumentException): ApiDtos.ErrorResponse
+        + handleUnauthorized(e: UnauthorizedException): ApiDtos.ErrorResponse
+        + handleForbidden(e: ForbiddenException): ApiDtos.ErrorResponse
+        + handleTooManyRequests(e: TooManyRequestsException): ApiDtos.ErrorResponse
+        + handleIllegalState(e: IllegalStateException): ApiDtos.ErrorResponse
+        }
+
+}
+
+package "DTOs API" {
+    class ApiDtos <<DTO>> {
+        - ApiDtos()
+        }
+
+    class CrearUsuarioRequest <<DTO>> {
+        - username: String
+        - email: String
+        - passwordHash: String
+        - region: String
+        - juego: String
+        - rango: int
+        - latencia: int
+        - verificarEmail: boolean
+        --
+        + username(): String
+        + email(): String
+        + passwordHash(): String
+        + region(): String
+        + juego(): String
+        + rango(): int
+        + latencia(): int
+        + verificarEmail(): boolean
+        }
+
+    class RegisterRequest <<DTO>> {
+        - username: String
+        - email: String
+        - password: String
+        - region: String
+        - juego: String
+        - rango: int
+        - latencia: int
+        - rolesPreferidos: List<String>
+        - disponibilidad: String
+        --
+        + username(): String
+        + email(): String
+        + password(): String
+        + region(): String
+        + juego(): String
+        + rango(): int
+        + latencia(): int
+        + rolesPreferidos(): List<String>
+        + disponibilidad(): String
+        }
+
+    class LoginRequest <<DTO>> {
+        - username: String
+        - password: String
+        --
+        + username(): String
+        + password(): String
+        }
+
+    class AuthResponse <<DTO>> {
+        - token: String
+        - usuario: UsuarioResponse
+        --
+        + token(): String
+        + usuario(): UsuarioResponse
+        }
+
+    class ActualizarPerfilRequest <<DTO>> {
+        - region: String
+        - juegoPrincipal: String
+        - rango: Integer
+        - rangosPorJuego: Map<String, Integer>
+        - latencia: Integer
+        - rolesPreferidos: List<String>
+        - disponibilidad: String
+        --
+        + region(): String
+        + juegoPrincipal(): String
+        + rango(): Integer
+        + rangosPorJuego(): Map<String, Integer>
+        + latencia(): Integer
+        + rolesPreferidos(): List<String>
+        + disponibilidad(): String
+        + ActualizarPerfilRequest(region: String, juegoPrincipal: String, rango: Integer, latencia: Integer, rolesPreferidos: List<String>, disponibilidad: String)
+        }
+
+    class UsuarioResponse <<DTO>> {
+        - id: UUID
+        - username: String
+        - email: String
+        - region: String
+        - juegoPrincipal: String
+        - rangoPrincipal: int
+        - rangosPorJuego: Map<String, Integer>
+        - latenciaPromedio: int
+        - rolesPreferidos: List<String>
+        - disponibilidad: String
+        - verificado: boolean
+        - rolSistema: String
+        - strikes: int
+        - cooldownHasta: LocalDateTime
+        --
+        + id(): UUID
+        + username(): String
+        + email(): String
+        + region(): String
+        + juegoPrincipal(): String
+        + rangoPrincipal(): int
+        + rangosPorJuego(): Map<String, Integer>
+        + latenciaPromedio(): int
+        + rolesPreferidos(): List<String>
+        + disponibilidad(): String
+        + verificado(): boolean
+        + rolSistema(): String
+        + strikes(): int
+        + cooldownHasta(): LocalDateTime
+        }
+
+    class CrearScrimRequest <<DTO>> {
+        - juego: String
+        - formato: String
+        - region: String
+        - rangoMin: int
+        - rangoMax: int
+        - latenciaMax: int
+        - fechaHora: LocalDateTime
+        - duracionMinutos: int
+        - cuposTotales: int
+        - modalidad: String
+        --
+        + juego(): String
+        + formato(): String
+        + region(): String
+        + rangoMin(): int
+        + rangoMax(): int
+        + latenciaMax(): int
+        + fechaHora(): LocalDateTime
+        + duracionMinutos(): int
+        + cuposTotales(): int
+        + modalidad(): String
+        + CrearScrimRequest(juego: String, formato: String, region: String, rangoMin: int, rangoMax: int, latenciaMax: int, fechaHora: LocalDateTime, duracionMinutos: int, cuposTotales: int)
+        }
+
+    class PostulacionRequest <<DTO>> {
+        - username: String
+        - rol: String
+        --
+        + username(): String
+        + rol(): String
+        }
+
+    class UsuarioOperacionRequest <<DTO>> {
+        - username: String
+        --
+        + username(): String
+        }
+
+    class CambiarRolRequest <<DTO>> {
+        - username: String
+        - nuevoRol: String
+        --
+        + username(): String
+        + nuevoRol(): String
+        }
+
+    class IntercambiarRolesRequest <<DTO>> {
+        - usernameA: String
+        - usernameB: String
+        --
+        + usernameA(): String
+        + usernameB(): String
+        }
+
+    class NotificacionesRequest <<DTO>> {
+        - usernames: List<String>
+        --
+        + usernames(): List<String>
+        }
+
+    class SchedulerRequest <<DTO>> {
+        - ahora: LocalDateTime
+        --
+        + ahora(): LocalDateTime
+        }
+
+    class RecordatoriosRequest <<DTO>> {
+        - ahora: LocalDateTime
+        - horasAntes: int
+        --
+        + ahora(): LocalDateTime
+        + horasAntes(): int
+        }
+
+    class RecordatorioResponse <<DTO>> {
+        - scrimId: UUID
+        - username: String
+        - horasAntes: int
+        - canal: String
+        - ical: String
+        - fechaEnvio: LocalDateTime
+        --
+        + scrimId(): UUID
+        + username(): String
+        + horasAntes(): int
+        + canal(): String
+        + ical(): String
+        + fechaEnvio(): LocalDateTime
+        }
+
+    class IcalResponse <<DTO>> {
+        - scrimId: UUID
+        - contenido: String
+        --
+        + scrimId(): UUID
+        + contenido(): String
+        }
+
+    class EstadisticaInput <<DTO>> {
+        - username: String
+        - kills: int
+        - deaths: int
+        - assists: int
+        --
+        + username(): String
+        + kills(): int
+        + deaths(): int
+        + assists(): int
+        }
+
+    class RegistrarEstadisticasRequest <<DTO>> {
+        - resultados: List<EstadisticaInput>
+        --
+        + resultados(): List<EstadisticaInput>
+        }
+
+    class FeedbackRequest <<DTO>> {
+        - autor: String
+        - destinatario: String
+        - rating: int
+        - comentario: String
+        --
+        + autor(): String
+        + destinatario(): String
+        + rating(): int
+        + comentario(): String
+        }
+
+    class FeedbackResponse <<DTO>> {
+        - id: UUID
+        - scrimId: UUID
+        - autor: String
+        - destinatario: String
+        - rating: int
+        - comentario: String
+        - estado: String
+        - fechaCreacion: LocalDateTime
+        --
+        + id(): UUID
+        + scrimId(): UUID
+        + autor(): String
+        + destinatario(): String
+        + rating(): int
+        + comentario(): String
+        + estado(): String
+        + fechaCreacion(): LocalDateTime
+        }
+
+    class ReporteConductaRequest <<DTO>> {
+        - reportante: String
+        - reportado: String
+        - motivo: String
+        --
+        + reportante(): String
+        + reportado(): String
+        + motivo(): String
+        }
+
+    class ResolverReporteRequest <<DTO>> {
+        - sancion: String
+        --
+        + sancion(): String
+        }
+
+    class BusquedaFavoritaRequest <<DTO>> {
+        - juego: String
+        - formato: String
+        - region: String
+        - rangoMin: Integer
+        - rangoMax: Integer
+        - latenciaMax: Integer
+        - fecha: LocalDate
+        --
+        + juego(): String
+        + formato(): String
+        + region(): String
+        + rangoMin(): Integer
+        + rangoMax(): Integer
+        + latenciaMax(): Integer
+        + fecha(): LocalDate
+        }
+
+    class BusquedaFavoritaResponse <<DTO>> {
+        - id: UUID
+        - username: String
+        - juego: String
+        - formato: String
+        - region: String
+        - rangoMin: Integer
+        - rangoMax: Integer
+        - latenciaMax: Integer
+        - fecha: LocalDate
+        - fechaCreacion: LocalDateTime
+        --
+        + id(): UUID
+        + username(): String
+        + juego(): String
+        + formato(): String
+        + region(): String
+        + rangoMin(): Integer
+        + rangoMax(): Integer
+        + latenciaMax(): Integer
+        + fecha(): LocalDate
+        + fechaCreacion(): LocalDateTime
+        }
+
+    class AlertaBusquedaResponse <<DTO>> {
+        - id: UUID
+        - busquedaId: UUID
+        - username: String
+        - scrimId: UUID
+        - mensaje: String
+        - fechaCreacion: LocalDateTime
+        --
+        + id(): UUID
+        + busquedaId(): UUID
+        + username(): String
+        + scrimId(): UUID
+        + mensaje(): String
+        + fechaCreacion(): LocalDateTime
+        }
+
+    class DashboardMeResponse <<DTO>> {
+        - usuario: UsuarioResponse
+        - misScrimsTotal: int
+        - scrimsPorConfirmar: int
+        - alertasTotal: int
+        - busquedasFavoritasTotal: int
+        - proximosScrims: List<MiScrimResponse>
+        - alertasRecientes: List<AlertaBusquedaResponse>
+        --
+        + usuario(): UsuarioResponse
+        + misScrimsTotal(): int
+        + scrimsPorConfirmar(): int
+        + alertasTotal(): int
+        + busquedasFavoritasTotal(): int
+        + proximosScrims(): List<MiScrimResponse>
+        + alertasRecientes(): List<AlertaBusquedaResponse>
+        }
+
+    class MisScrimsResponse <<DTO>> {
+        - scrims: List<MiScrimResponse>
+        --
+        + scrims(): List<MiScrimResponse>
+        }
+
+    class MiScrimResponse <<DTO>> {
+        - id: UUID
+        - juego: String
+        - formato: String
+        - region: String
+        - estado: String
+        - modalidad: String
+        - cuposTotales: int
+        - cuposDisponibles: int
+        - fechaHora: LocalDateTime
+        - miRol: String
+        - miEstadoPostulacion: String
+        - confirmado: boolean
+        - puedeConfirmar: boolean
+        --
+        + id(): UUID
+        + juego(): String
+        + formato(): String
+        + region(): String
+        + estado(): String
+        + modalidad(): String
+        + cuposTotales(): int
+        + cuposDisponibles(): int
+        + fechaHora(): LocalDateTime
+        + miRol(): String
+        + miEstadoPostulacion(): String
+        + confirmado(): boolean
+        + puedeConfirmar(): boolean
+        }
+
+    class ParticipantesScrimResponse <<DTO>> {
+        - scrimId: UUID
+        - estado: String
+        - cuposTotales: int
+        - cuposDisponibles: int
+        - equipos: List<EquipoResponse>
+        - aceptados: List<ParticipanteScrimResponse>
+        - suplentes: List<ParticipanteScrimResponse>
+        - pendientes: List<ParticipanteScrimResponse>
+        - rechazados: List<ParticipanteScrimResponse>
+        --
+        + scrimId(): UUID
+        + estado(): String
+        + cuposTotales(): int
+        + cuposDisponibles(): int
+        + equipos(): List<EquipoResponse>
+        + aceptados(): List<ParticipanteScrimResponse>
+        + suplentes(): List<ParticipanteScrimResponse>
+        + pendientes(): List<ParticipanteScrimResponse>
+        + rechazados(): List<ParticipanteScrimResponse>
+        }
+
+    class ParticipanteScrimResponse <<DTO>> {
+        - username: String
+        - rol: String
+        - estadoPostulacion: String
+        - confirmado: boolean
+        - fechaConfirmacion: LocalDateTime
+        - rangoEnJuego: int
+        - latenciaPromedio: int
+        --
+        + username(): String
+        + rol(): String
+        + estadoPostulacion(): String
+        + confirmado(): boolean
+        + fechaConfirmacion(): LocalDateTime
+        + rangoEnJuego(): int
+        + latenciaPromedio(): int
+        }
+
+    class CatalogosResponse <<DTO>> {
+        - juegos: List<JuegoCatalogoResponse>
+        - modalidades: List<String>
+        --
+        + juegos(): List<JuegoCatalogoResponse>
+        + modalidades(): List<String>
+        }
+
+    class JuegoCatalogoResponse <<DTO>> {
+        - juego: String
+        - formatosPermitidos: List<String>
+        - rolesPermitidos: List<String>
+        --
+        + juego(): String
+        + formatosPermitidos(): List<String>
+        + rolesPermitidos(): List<String>
+        }
+
+    class AuditLogResponse <<DTO>> {
+        - id: UUID
+        - actor: String
+        - accion: String
+        - entidadTipo: String
+        - entidadId: String
+        - detalle: String
+        - fecha: LocalDateTime
+        --
+        + id(): UUID
+        + actor(): String
+        + accion(): String
+        + entidadTipo(): String
+        + entidadId(): String
+        + detalle(): String
+        + fecha(): LocalDateTime
+        }
+
+    class ReporteConductaResponse <<DTO>> {
+        - id: UUID
+        - scrimId: UUID
+        - reportante: String
+        - reportado: String
+        - motivo: String
+        - estado: String
+        - sancion: String
+        - etapaResolucion: String
+        - strikesReportado: int
+        - fechaCreacion: LocalDateTime
+        --
+        + id(): UUID
+        + scrimId(): UUID
+        + reportante(): String
+        + reportado(): String
+        + motivo(): String
+        + estado(): String
+        + sancion(): String
+        + etapaResolucion(): String
+        + strikesReportado(): int
+        + fechaCreacion(): LocalDateTime
+        }
+
+    class EstadisticaResponse <<DTO>> {
+        - username: String
+        - kills: int
+        - deaths: int
+        - assists: int
+        - kda: double
+        - mvp: boolean
+        --
+        + username(): String
+        + kills(): int
+        + deaths(): int
+        + assists(): int
+        + kda(): double
+        + mvp(): boolean
+        }
+
+    class ScrimResponse <<DTO>> {
+        - id: UUID
+        - juego: String
+        - formato: String
+        - region: String
+        - estado: String
+        - cuposTotales: int
+        - modalidad: String
+        - cuposDisponibles: int
+        - fechaHora: LocalDateTime
+        - equipos: List<EquipoResponse>
+        - postulaciones: List<PostulacionResponse>
+        --
+        + id(): UUID
+        + juego(): String
+        + formato(): String
+        + region(): String
+        + estado(): String
+        + cuposTotales(): int
+        + modalidad(): String
+        + cuposDisponibles(): int
+        + fechaHora(): LocalDateTime
+        + equipos(): List<EquipoResponse>
+        + postulaciones(): List<PostulacionResponse>
+        }
+
+    class EquipoResponse <<DTO>> {
+        - lado: String
+        - jugadores: List<ParticipanteScrimResponse>
+        --
+        + lado(): String
+        + jugadores(): List<ParticipanteScrimResponse>
+        }
+
+    class PostulacionResponse <<DTO>> {
+        - username: String
+        - rol: String
+        - estado: String
+        --
+        + username(): String
+        + rol(): String
+        + estado(): String
+        }
+
+    class SchedulerResponse <<DTO>> {
+        - iniciados: int
+        --
+        + iniciados(): int
+        }
+
+    class ErrorResponse <<DTO>> {
+        - error: String
+        --
+        + error(): String
+        }
+
+}
+
+package "Errores API" {
+    class ForbiddenException <<Exception>> {
+        + ForbiddenException(message: String)
+        }
+
+    class UnauthorizedException <<Exception>> {
+        + UnauthorizedException(message: String)
+        }
+
+    class TooManyRequestsException <<Exception>> {
+        + TooManyRequestsException(message: String)
+        }
+
+}
+
+ApiDtos *-- CrearUsuarioRequest
+ApiDtos *-- RegisterRequest
+ApiDtos *-- LoginRequest
+ApiDtos *-- AuthResponse
+ApiDtos *-- ActualizarPerfilRequest
+ApiDtos *-- UsuarioResponse
+ApiDtos *-- CrearScrimRequest
+ApiDtos *-- PostulacionRequest
+ApiDtos *-- UsuarioOperacionRequest
+ApiDtos *-- CambiarRolRequest
+ApiDtos *-- IntercambiarRolesRequest
+ApiDtos *-- NotificacionesRequest
+ApiDtos *-- SchedulerRequest
+ApiDtos *-- RecordatoriosRequest
+ApiDtos *-- RecordatorioResponse
+ApiDtos *-- IcalResponse
+ApiDtos *-- EstadisticaInput
+ApiDtos *-- RegistrarEstadisticasRequest
+ApiDtos *-- FeedbackRequest
+ApiDtos *-- FeedbackResponse
+ApiDtos *-- ReporteConductaRequest
+ApiDtos *-- ResolverReporteRequest
+ApiDtos *-- BusquedaFavoritaRequest
+ApiDtos *-- BusquedaFavoritaResponse
+ApiDtos *-- AlertaBusquedaResponse
+ApiDtos *-- DashboardMeResponse
+ApiDtos *-- MisScrimsResponse
+ApiDtos *-- MiScrimResponse
+ApiDtos *-- ParticipantesScrimResponse
+ApiDtos *-- ParticipanteScrimResponse
+ApiDtos *-- CatalogosResponse
+ApiDtos *-- JuegoCatalogoResponse
+ApiDtos *-- AuditLogResponse
+ApiDtos *-- ReporteConductaResponse
+ApiDtos *-- EstadisticaResponse
+ApiDtos *-- ScrimResponse
+ApiDtos *-- EquipoResponse
+ApiDtos *-- PostulacionResponse
+ApiDtos *-- SchedulerResponse
+ApiDtos *-- ErrorResponse
+
+AuthResponse --> UsuarioResponse
+RegistrarEstadisticasRequest --> EstadisticaInput
+DashboardMeResponse --> UsuarioResponse
+DashboardMeResponse --> MiScrimResponse
+DashboardMeResponse --> AlertaBusquedaResponse
+MisScrimsResponse --> MiScrimResponse
+ParticipantesScrimResponse --> EquipoResponse
+ParticipantesScrimResponse --> ParticipanteScrimResponse
+EquipoResponse --> ParticipanteScrimResponse
+CatalogosResponse --> JuegoCatalogoResponse
+ScrimResponse --> EquipoResponse
+ScrimResponse --> PostulacionResponse
+
+AuthRestController ..> RegisterRequest
+AuthRestController ..> LoginRequest
+AuthRestController ..> AuthResponse
+AuthRestController ..> UsuarioResponse
+AuthRestController ..> ActualizarPerfilRequest
+UsuarioRestController ..> CrearUsuarioRequest
+UsuarioRestController ..> UsuarioResponse
+ScrimRestController ..> CrearScrimRequest
+ScrimRestController ..> ScrimResponse
+ScrimRestController ..> PostulacionRequest
+ScrimRestController ..> UsuarioOperacionRequest
+ScrimRestController ..> SchedulerRequest
+ScrimRestController ..> SchedulerResponse
+ScrimRestController ..> RecordatoriosRequest
+ScrimRestController ..> RecordatorioResponse
+ScrimRestController ..> IcalResponse
+ScrimRestController ..> CambiarRolRequest
+ScrimRestController ..> IntercambiarRolesRequest
+ScrimRestController ..> RegistrarEstadisticasRequest
+ScrimRestController ..> EstadisticaResponse
+ScrimRestController ..> NotificacionesRequest
+FrontendRestController ..> DashboardMeResponse
+FrontendRestController ..> MisScrimsResponse
+FrontendRestController ..> MiScrimResponse
+FrontendRestController ..> ParticipantesScrimResponse
+FrontendRestController ..> ParticipanteScrimResponse
+FrontendRestController ..> EquipoResponse
+FrontendRestController ..> UsuarioResponse
+FrontendRestController ..> AlertaBusquedaResponse
+BusquedaFavoritaRestController ..> BusquedaFavoritaRequest
+BusquedaFavoritaRestController ..> BusquedaFavoritaResponse
+BusquedaFavoritaRestController ..> AlertaBusquedaResponse
+ModeracionRestController ..> FeedbackRequest
+ModeracionRestController ..> FeedbackResponse
+ModeracionRestController ..> ReporteConductaRequest
+ModeracionRestController ..> ResolverReporteRequest
+ModeracionRestController ..> ReporteConductaResponse
+CatalogoRestController ..> CatalogosResponse
+CatalogoRestController ..> JuegoCatalogoResponse
+AuditRestController ..> AuditLogResponse
+ApiExceptionHandler ..> ErrorResponse
+ApiExceptionHandler ..> ForbiddenException
+ApiExceptionHandler ..> UnauthorizedException
+ApiExceptionHandler ..> TooManyRequestsException
+
+@enduml
