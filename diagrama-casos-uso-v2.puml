@@ -1,0 +1,157 @@
+@startuml diagrama-casos-uso-v2
+
+skinparam actorStyle awesome
+skinparam usecaseFontSize 12
+skinparam packageBackgroundColor #F8F8FF
+skinparam packageBorderColor #AAAAAA
+skinparam rectangleBorderColor #444444
+skinparam usecase {
+  BackgroundColor #DDEEFF
+  BorderColor #336699
+}
+skinparam actor {
+  BackgroundColor #FFFDE7
+  BorderColor #F9A825
+}
+skinparam note {
+  BackgroundColor #FFF8E1
+  BorderColor #C8A600
+}
+
+left to right direction
+
+' ============================================================
+' ACTORES
+' ============================================================
+
+actor "Visitante" as Visitante
+actor "Jugador" as Jugador
+actor "Organizador" as Organizador
+actor "Moderador" as Moderador
+actor "Administrador" as Administrador
+actor "Sistema\n(Scheduler)" as Scheduler
+actor "Proveedor externo\n(Notificaciones)" as Proveedor
+
+' ============================================================
+' SISTEMA
+' ============================================================
+
+rectangle "eScrims — Plataforma de organizacion de scrims" {
+
+  package "Usuarios y seguridad" {
+    usecase "CU1 - Registrar usuario" as CU1
+    usecase "CU2 - Autenticar usuario" as CU2
+    usecase "CU3 - Editar perfil competitivo" as CU3
+    usecase "CU4 - Verificar email" as CU4
+    usecase "CU5 - Gestionar roles de sistema" as CU5
+  }
+
+  package "Busqueda y descubrimiento" {
+    usecase "CU6 - Buscar y filtrar scrims" as CU6
+    usecase "CU7 - Guardar busqueda favorita" as CU7
+    usecase "CU8 - Generar alertas por compatibilidad" as CU8
+  }
+
+  package "Gestion de scrims" {
+    usecase "CU9 - Crear scrim" as CU9
+    usecase "CU10 - Configurar modalidad y reglas" as CU10
+    usecase "CU11 - Postularse a scrim" as CU11
+    usecase "CU12 - Validar reglas por juego" as CU12
+    usecase "CU13 - Gestionar lobby" as CU13
+    usecase "CU14 - Asignar equipos A/B y roles" as CU14
+    usecase "CU15 - Mover titular/suplente" as CU15
+    usecase "CU16 - Deshacer cambio de lobby" as CU16
+    usecase "CU17 - Confirmar asistencia" as CU17
+    usecase "CU18 - Iniciar scrim\nmanual/automatico" as CU18
+    usecase "CU19 - Finalizar scrim y cargar estadisticas" as CU19
+    usecase "CU20 - Cancelar scrim" as CU20
+  }
+
+  package "Calendario y notificaciones" {
+    usecase "CU21 - Descargar iCal" as CU21
+    usecase "CU22 - Programar recordatorios" as CU22
+    usecase "CU23 - Enviar recordatorio automatico" as CU23
+    usecase "CU24 - Enviar notificacion" as CU24
+  }
+
+  package "Feedback y moderacion" {
+    usecase "CU25 - Dejar feedback" as CU25
+    usecase "CU26 - Reportar jugador" as CU26
+    usecase "CU27 - Moderar reporte" as CU27
+    usecase "CU28 - Aplicar sancion" as CU28
+  }
+
+  package "Administracion" {
+    usecase "CU29 - Gestionar catalogo de juegos" as CU29
+    usecase "CU30 - Gestionar reglas por juego" as CU30
+    usecase "CU31 - Consultar auditoria" as CU31
+  }
+
+  ' ---- Reglas del dominio ----
+  CU9 .> CU10 : <<include>>
+  CU11 .> CU12 : <<include>>
+  CU13 .> CU14 : <<include>>
+  CU13 .> CU15 : <<extend>>
+  CU13 .> CU16 : <<extend>>
+  CU18 .> CU17 : <<include>>
+
+  ' ---- Notificaciones ----
+  CU8 .> CU24 : <<include>>
+  CU18 .> CU24 : <<include>>
+  CU20 .> CU24 : <<include>>
+  CU22 .> CU23 : <<include>>
+  CU23 .> CU24 : <<include>>
+
+  ' ---- Moderacion ----
+  CU27 .> CU28 : <<extend>>
+
+  note right of CU2
+    Los casos de uso privados requieren
+    autenticacion JWT y rol suficiente.
+  end note
+
+  note right of CU24
+    Las notificaciones se despachan
+    mediante adapters y cola externa.
+  end note
+}
+
+' ============================================================
+' RELACIONES ACTOR -> CASO DE USO
+' ============================================================
+
+Visitante --> CU1
+Visitante --> CU2
+Visitante --> CU6
+
+Jugador --> CU3
+Jugador --> CU6
+Jugador --> CU7
+Jugador --> CU11
+Jugador --> CU17
+Jugador --> CU21
+Jugador --> CU25
+Jugador --> CU26
+
+Organizador --> CU9
+Organizador --> CU13
+Organizador --> CU18
+Organizador --> CU19
+Organizador --> CU20
+
+Moderador --> CU27
+
+Administrador --> CU5
+Administrador --> CU29
+Administrador --> CU30
+Administrador --> CU31
+
+Scheduler --> CU4
+Scheduler --> CU8
+Scheduler --> CU18
+Scheduler --> CU22
+Scheduler --> CU23
+
+Proveedor --> CU24
+
+@enduml

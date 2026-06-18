@@ -1,0 +1,232 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classHeaderBackgroundColor #E8F3E8
+skinparam packageBackgroundColor #FAFFFA
+
+title eScrims - Modelo de dominio
+
+package "Agregado Scrim" {
+    class ScrimContext <<AggregateRoot>> {
+        - id: UUID
+        - juego: String
+        - formato: String
+        - region: String
+        - rangoMin: int
+        - rangoMax: int
+        - latenciaMax: int
+        - fechaHora: LocalDateTime
+        - duracionMinutos: int
+        - cuposTotales: int
+        - modalidad: String
+        --
+        + postular(usuario: Usuario, rol: Rol): void
+        + confirmar(usuario: Usuario): void
+        + iniciar(): void
+        + finalizar(): void
+        + cancelar(): void
+        + cuposDisponibles(): int
+        + todosConfirmaron(): boolean
+    }
+
+    class Equipo <<Entity>> {
+        - id: UUID
+        - lado: String
+        --
+        + agregarJugador(usuario: Usuario): void
+        + removerJugador(usuario: Usuario): void
+        + estaCompleto(cuposPorLado: int): boolean
+    }
+
+    class Postulacion <<Entity>> {
+        - id: UUID
+        - fechaPostulacion: LocalDateTime
+        --
+        + aceptar(): void
+        + rechazar(): void
+        + marcarSuplente(): void
+        + cambiarRol(nuevoRol: Rol): void
+        + estaAceptada(): boolean
+    }
+
+    class Confirmacion <<Entity>> {
+        - id: UUID
+        - confirmado: boolean
+        - fechaConfirmacion: LocalDateTime
+        --
+        + confirmar(): void
+    }
+
+    class Estadistica <<Entity>> {
+        - id: UUID
+        - mvp: boolean
+        - kills: int
+        - deaths: int
+        - assists: int
+        - observaciones: String
+        --
+        + getKda(): double
+    }
+}
+
+package "Usuarios" {
+    class Usuario <<Entity>> {
+        - id: UUID
+        - username: String
+        - email: String
+        - passwordHash: String
+        - rangoPorJuego: Map<String, Integer>
+        - region: String
+        - latenciaPromedio: int
+        - disponibilidad: String
+        - rolSistema: String
+        - strikes: int
+        - cooldownHasta: LocalDateTime
+        - verificado: boolean
+        --
+        + verificarEmail(): void
+        + agregarStrike(): void
+        + activarCooldown(horas: int): void
+        + isCooldownActivo(): boolean
+        + getRangoEnJuego(juego: String): int
+    }
+
+    class Rol <<ValueObject>> {
+        - nombre: String
+        - juego: String
+    }
+}
+
+package "Estados de dominio" {
+    interface EstadoPostulacion <<State>>
+    class PendientePostulacion
+    class AceptadaPostulacion
+    class RechazadaPostulacion
+    class SuplentePostulacion
+
+    interface EstadoNotificacion <<State>>
+    class PendienteNotificacion
+    class EnviadaNotificacion
+    class FallidaNotificacion
+
+    interface EstadoModeracion <<State>>
+    class PendienteModeracion
+    class AprobadoModeracion
+    class RechazadoModeracion
+}
+
+package "Comunicacion y seguimiento" {
+    class Notificacion <<Entity>> {
+        - id: UUID
+        - tipo: String
+        - canal: String
+        - payload: String
+        - fechaCreacion: LocalDateTime
+        --
+        + marcarEnviada(): void
+        + marcarFallida(): void
+    }
+
+    class RecordatorioScrim <<Entity>> {
+        - scrimId: UUID
+        - username: String
+        - horasAntes: int
+        - canal: String
+        - ical: String
+        - fechaEnvio: LocalDateTime
+    }
+
+    class Feedback <<Entity>> {
+        - id: UUID
+        - scrimId: UUID
+        - rating: int
+        - comentario: String
+        - fechaCreacion: LocalDateTime
+        --
+        + aprobar(): void
+        + rechazar(): void
+    }
+
+    class ReporteConducta <<Entity>> {
+        - id: UUID
+        - scrimId: UUID
+        - motivo: String
+        - sancion: String
+        - etapaResolucion: String
+        - fechaCreacion: LocalDateTime
+        --
+        + aprobar(sancion: String): void
+        + rechazar(): void
+        + marcarEtapaResolucion(etapa: String): void
+    }
+
+    class BusquedaFavorita <<Entity>> {
+        - id: UUID
+        - juego: String
+        - formato: String
+        - region: String
+        - rangoMin: Integer
+        - rangoMax: Integer
+        - latenciaMax: Integer
+        - fecha: LocalDate
+    }
+
+    class AlertaBusqueda <<Entity>> {
+        - id: UUID
+        - busquedaId: UUID
+        - scrimId: UUID
+        - mensaje: String
+        - fechaCreacion: LocalDateTime
+    }
+
+    class AuditLog <<Entity>> {
+        - id: UUID
+        - actor: String
+        - accion: String
+        - entidadTipo: String
+        - entidadId: String
+        - detalle: String
+        - fecha: LocalDateTime
+    }
+}
+
+ScrimContext "1" *-- "2" Equipo : compone
+ScrimContext "1" *-- "0..*" Postulacion : registra
+ScrimContext "1" *-- "0..*" Confirmacion : requiere
+ScrimContext "1" *-- "0..*" Estadistica : resultados
+
+Equipo "1" o-- "0..*" Usuario : jugadores
+Usuario "1" o-- "0..*" Rol : rolesPreferidos
+Postulacion "1" --> "1" Usuario : candidato
+Postulacion "1" --> "1" Rol : rolDeseado
+Confirmacion "1" --> "1" Usuario : participante
+Estadistica "1" --> "1" Usuario : jugador
+
+Postulacion --> EstadoPostulacion
+EstadoPostulacion <|.. PendientePostulacion
+EstadoPostulacion <|.. AceptadaPostulacion
+EstadoPostulacion <|.. RechazadaPostulacion
+EstadoPostulacion <|.. SuplentePostulacion
+
+Notificacion --> EstadoNotificacion
+EstadoNotificacion <|.. PendienteNotificacion
+EstadoNotificacion <|.. EnviadaNotificacion
+EstadoNotificacion <|.. FallidaNotificacion
+
+Feedback --> EstadoModeracion
+ReporteConducta --> EstadoModeracion
+EstadoModeracion <|.. PendienteModeracion
+EstadoModeracion <|.. AprobadoModeracion
+EstadoModeracion <|.. RechazadoModeracion
+
+RecordatorioScrim ..> ScrimContext : referencia
+RecordatorioScrim --> Usuario : destinatario
+Feedback --> Usuario : autor
+Feedback --> Usuario : destinatario
+ReporteConducta --> Usuario : reportante
+ReporteConducta --> Usuario : reportado
+BusquedaFavorita --> Usuario : usuario
+AlertaBusqueda --> Usuario : usuario
+AlertaBusqueda ..> ScrimContext : scrim compatible
+
+@enduml
