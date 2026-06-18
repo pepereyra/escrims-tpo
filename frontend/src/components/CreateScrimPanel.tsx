@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { defaultGameFormValues } from './GameSelects'
 import {
   getDefaultFormato,
+  getCuposTotalesForFormato,
   getFormatos,
   isJuego,
   JUEGOS,
@@ -37,6 +38,7 @@ function buildInitialForm(user: ReturnType<typeof useAuth>['user']) {
     user?.juegoPrincipal && isJuego(user.juegoPrincipal)
       ? user.juegoPrincipal
       : defaults.juego
+  const initialFormato = getDefaultFormato(initialJuego)
   const initialRangoRange = user?.rangoPrincipal
     ? getRangoRangeAround(initialJuego, user.rangoPrincipal)
     : getDefaultRangoRange(initialJuego)
@@ -50,7 +52,7 @@ function buildInitialForm(user: ReturnType<typeof useAuth>['user']) {
     latenciaMax: user?.latenciaPromedio ?? 50,
     fechaHora: toDatetimeLocal(),
     duracionMinutos: 60,
-    cuposTotales: 10,
+    cuposTotales: getCuposTotalesForFormato(initialFormato),
     modalidad: 'CASUAL' as Modalidad,
   }
 }
@@ -67,12 +69,22 @@ export function CreateScrimPanel({ open, onClose, onCreated }: CreateScrimPanelP
 
   const setJuego = (juego: Juego) => {
     const range = getDefaultRangoRange(juego)
+    const formato = getDefaultFormato(juego)
     setForm((prev) => ({
       ...prev,
       juego,
-      formato: getDefaultFormato(juego),
+      formato,
+      cuposTotales: getCuposTotalesForFormato(formato),
       rangoMin: range.rangoMin,
       rangoMax: range.rangoMax,
+    }))
+  }
+
+  const setFormato = (formato: string) => {
+    setForm((prev) => ({
+      ...prev,
+      formato,
+      cuposTotales: getCuposTotalesForFormato(formato),
     }))
   }
 
@@ -95,7 +107,7 @@ export function CreateScrimPanel({ open, onClose, onCreated }: CreateScrimPanelP
     setForm((prev) => ({ ...prev, rangoMax: value }))
   }
 
-  const handleNumberChange = (name: 'duracionMinutos' | 'cuposTotales', value: string) => {
+  const handleNumberChange = (name: 'duracionMinutos', value: string) => {
     const parsed = Number(value)
     if (!Number.isFinite(parsed)) return
     setForm((prev) => ({ ...prev, [name]: parsed }))
@@ -168,7 +180,7 @@ export function CreateScrimPanel({ open, onClose, onCreated }: CreateScrimPanelP
                       key={formato}
                       type="button"
                       className={`filters-chip${form.formato === formato ? ' active' : ''}`}
-                      onClick={() => setForm((prev) => ({ ...prev, formato }))}
+                      onClick={() => setFormato(formato)}
                       aria-pressed={form.formato === formato}
                     >
                       {formato}
@@ -307,7 +319,8 @@ export function CreateScrimPanel({ open, onClose, onCreated }: CreateScrimPanelP
                     type="number"
                     min={2}
                     value={form.cuposTotales}
-                    onChange={(e) => handleNumberChange('cuposTotales', e.target.value)}
+                    readOnly
+                    aria-readonly="true"
                     required
                   />
                 </div>

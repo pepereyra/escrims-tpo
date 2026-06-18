@@ -17,41 +17,22 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<Layout />}>
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<ScrimsPage />} />
             <Route path="scrims/:id" element={<ScrimDetailPage />} />
             <Route
               path="crear"
-              element={
-                <ProtectedRoute>
-                  <Navigate to="/?crear=1" replace />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/?crear=1" replace />}
             />
-            <Route
-              path="perfil"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="favoritos"
-              element={
-                <ProtectedRoute>
-                  <FavoritesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="notificaciones"
-              element={
-                <ProtectedRoute>
-                  <NotificationsPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="perfil" element={<ProfilePage />} />
+            <Route path="favoritos" element={<FavoritesPage />} />
+            <Route path="notificaciones" element={<NotificationsPage />} />
             <Route
               path="auditoria"
               element={

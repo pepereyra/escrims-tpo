@@ -1,16 +1,27 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { GameSelects, defaultGameFormValues } from '../components/GameSelects'
 import { RankSelects, defaultRangoValues } from '../components/RankSelects'
 import { getDefaultRango } from '../constants/ranks'
 import { useAuth } from '../context/AuthContext'
 
 export function LoginPage() {
-  const { login, register } = useAuth()
+  const { login, register, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const from =
+    typeof location.state === 'object'
+      && location.state !== null
+      && 'from' in location.state
+      && typeof location.state.from === 'object'
+      && location.state.from !== null
+      && 'pathname' in location.state.from
+      && typeof location.state.from.pathname === 'string'
+      ? `${location.state.from.pathname}${'search' in location.state.from && typeof location.state.from.search === 'string' ? location.state.from.search : ''}`
+      : '/'
 
   const defaults = defaultGameFormValues()
   const rankDefaults = defaultRangoValues(defaults.juego)
@@ -43,12 +54,16 @@ export function LoginPage() {
       } else {
         await register({ ...form, username })
       }
-      navigate('/')
+      navigate(from, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al autenticar')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!authLoading && user) {
+    return <Navigate to={from} replace />
   }
 
   return (

@@ -9,8 +9,8 @@ export const REGIONES = [
 ] as const
 
 export const FORMATOS_POR_JUEGO: Record<Juego, readonly string[]> = {
-  Valorant: ['5v5', '2v2', '1v1'],
-  LoL: ['5v5', '3v3'],
+  Valorant: ['5v5', '3v3', '2v2', '1v1'],
+  LoL: ['5v5', '2v2', '1v1'],
   CS2: ['5v5', '2v2', '1v1'],
 }
 
@@ -41,4 +41,15 @@ export function getDefaultFormato(juego: string): string {
 export function normalizeFormato(juego: string, formato: string): string {
   const formatos = getFormatos(juego)
   return formatos.includes(formato) ? formato : formatos[0]
+}
+
+export function getCuposTotalesForFormato(formato: string): number {
+  const match = formato.trim().toLowerCase().match(/^(\d+)v(\d+)$/)
+  if (!match) return 10
+
+  const ladoA = Number(match[1])
+  const ladoB = Number(match[2])
+  if (!Number.isFinite(ladoA) || !Number.isFinite(ladoB)) return 10
+
+  return ladoA + ladoB
 }
