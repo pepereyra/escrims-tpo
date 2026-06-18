@@ -200,12 +200,61 @@ package "State - ciclo de vida" {
         + getNombre(): String
     }
 
-    class BuscandoState <<ConcreteState>>
-    class LobbyArmadoState <<ConcreteState>>
-    class ConfirmadoState <<ConcreteState>>
-    class EnJuegoState <<ConcreteState>>
-    class FinalizadoState <<ConcreteState>>
-    class CanceladoState <<ConcreteState>>
+    class BuscandoState <<ConcreteState>> {
+        - gameRulesRegistry: GameRulesRegistry
+        --
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
+
+    class LobbyArmadoState <<ConcreteState>> {
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
+
+    class ConfirmadoState <<ConcreteState>> {
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
+
+    class EnJuegoState <<ConcreteState>> {
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
+
+    class FinalizadoState <<ConcreteState>> {
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
+
+    class CanceladoState <<ConcreteState>> {
+        + postular(ctx: ScrimContext, usuario: Usuario, rol: Rol): void
+        + confirmar(ctx: ScrimContext, usuario: Usuario): void
+        + iniciar(ctx: ScrimContext): void
+        + finalizar(ctx: ScrimContext): void
+        + cancelar(ctx: ScrimContext): void
+        + getNombre(): String
+    }
 }
 
 package "Strategy - matchmaking" {
@@ -281,10 +330,29 @@ package "Builder + Template Method - reglas por juego" {
         + listarSoportadas(): List<GameRulesTemplate>
     }
 
-    class ValorantGameRulesTemplate <<ConcreteTemplate>>
-    class LeagueOfLegendsGameRulesTemplate <<ConcreteTemplate>>
-    class Cs2GameRulesTemplate <<ConcreteTemplate>>
-    class GenericGameRulesTemplate <<ConcreteTemplate>>
+    class ValorantGameRulesTemplate <<ConcreteTemplate>> {
+        + getJuego(): String
+        + formatosPermitidos(): List<String>
+        + rolesPermitidos(): List<String>
+    }
+
+    class LeagueOfLegendsGameRulesTemplate <<ConcreteTemplate>> {
+        + getJuego(): String
+        + formatosPermitidos(): List<String>
+        + rolesPermitidos(): List<String>
+    }
+
+    class Cs2GameRulesTemplate <<ConcreteTemplate>> {
+        + getJuego(): String
+        + formatosPermitidos(): List<String>
+        + rolesPermitidos(): List<String>
+    }
+
+    class GenericGameRulesTemplate <<ConcreteTemplate>> {
+        + getJuego(): String
+        + formatosPermitidos(): List<String>
+        + rolesPermitidos(): List<String>
+    }
 }
 
 package "Command - gestion de lobby" {
@@ -402,20 +470,52 @@ package "Observer + notificaciones" {
         + crearDiscordNotificador(): NotificadorStrategy
     }
 
-    class DevNotificadorFactory <<ConcreteFactory>>
-    class ProdNotificadorFactory <<ConcreteFactory>>
+    class DevNotificadorFactory <<ConcreteFactory>> {
+        + crearEmailNotificador(): NotificadorStrategy
+        + crearPushNotificador(): NotificadorStrategy
+        + crearDiscordNotificador(): NotificadorStrategy
+    }
+
+    class ProdNotificadorFactory <<ConcreteFactory>> {
+        + crearEmailNotificador(): NotificadorStrategy
+        + crearPushNotificador(): NotificadorStrategy
+        + crearDiscordNotificador(): NotificadorStrategy
+    }
 
     interface NotificadorStrategy <<Strategy>> {
         + getCanal(): String
         + enviar(destinatario: Usuario, notificacion: Notificacion): void
     }
 
-    class EmailNotificador <<Notifier>>
-    class PushNotificador <<Notifier>>
-    class DiscordNotificador <<Notifier>>
-    class SendGridEmailAdapter <<Adapter>>
-    class FirebasePushAdapter <<Adapter>>
-    class DiscordWebhookAdapter <<Adapter>>
+    class EmailNotificador <<Notifier>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
+
+    class PushNotificador <<Notifier>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
+
+    class DiscordNotificador <<Notifier>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
+
+    class SendGridEmailAdapter <<Adapter>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
+
+    class FirebasePushAdapter <<Adapter>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
+
+    class DiscordWebhookAdapter <<Adapter>> {
+        + getCanal(): String
+        + enviar(destinatario: Usuario, notificacion: Notificacion): void
+    }
 }
 
 package "Infraestructura" {
@@ -453,8 +553,25 @@ package "Infraestructura" {
         + deleteAll(): void
     }
 
-    class JpaScrimRepositoryAdapter <<RepositoryAdapter>>
-    class InMemoryScrimRepository <<Repository>>
+    class JpaScrimRepositoryAdapter <<RepositoryAdapter>> {
+        - scrimRepository: SpringDataScrimJpaRepository
+        - usuarioRepository: SpringDataUsuarioJpaRepository
+        - eventBus: DomainEventBus
+        --
+        + save(scrim: ScrimContext): ScrimContext
+        + findById(id: UUID): Optional<ScrimContext>
+        + findAll(): Collection<ScrimContext>
+        - toEntity(scrim: ScrimContext): ScrimJpaEntity
+        - toDomain(entity: ScrimJpaEntity): ScrimContext
+    }
+
+    class InMemoryScrimRepository <<Repository>> {
+        - scrims: Map<UUID, ScrimContext>
+        --
+        + save(scrim: ScrimContext): ScrimContext
+        + findById(id: UUID): Optional<ScrimContext>
+        + findAll(): Collection<ScrimContext>
+    }
 }
 
 package "Moderacion" {
@@ -497,9 +614,17 @@ package "Moderacion" {
         + resolver(reporte: ReporteConducta): ReporteResolution
     }
 
-    class AutoResolveReporteHandler <<ConcreteHandler>>
-    class BotModerationReporteHandler <<ConcreteHandler>>
-    class HumanModerationReporteHandler <<ConcreteHandler>>
+    class AutoResolveReporteHandler <<ConcreteHandler>> {
+        + resolver(reporte: ReporteConducta): ReporteResolution
+    }
+
+    class BotModerationReporteHandler <<ConcreteHandler>> {
+        + resolver(reporte: ReporteConducta): ReporteResolution
+    }
+
+    class HumanModerationReporteHandler <<ConcreteHandler>> {
+        + resolver(reporte: ReporteConducta): ReporteResolution
+    }
 }
 
 ' Relaciones principales
